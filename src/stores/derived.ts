@@ -1,4 +1,4 @@
-import { noWrite, Store } from './store'
+import { noRead, noWrite, Store } from './store'
 
 type Read = <Value>(store: Store<Value, any[], any>) => Value
 type Write = <Args extends any[], Result>(
@@ -6,13 +6,18 @@ type Write = <Args extends any[], Result>(
 	...args: Args
 ) => void
 
-export function createDerived<
+export function derived<
 	Value = never,
 	Args extends any[] = [never],
 	Result = never,
 >(
-	getter: (read: Read) => Value,
-	setter: (read: Read, write: Write, ...args: Args) => Result = noWrite,
+	{
+		getter,
+		setter,
+	}: {
+		getter?: (read: Read) => Value
+		setter?: (read: Read, write: Write, ...args: Args) => Result
+	},
 	onMount?: () => (() => void) | void,
 ) {
 	let dirty = true
@@ -22,7 +27,7 @@ export function createDerived<
 	let unmount: (() => void) | void = undefined
 	return new Store<Value, Args, Result>(
 		(...args: Args) =>
-			setter(
+			(setter ?? (noWrite as never))(
 				(store) => store.peek(),
 				(store, ...a) => store.send(...a),
 				...args,
@@ -40,7 +45,7 @@ export function createDerived<
 			if (dirty) {
 				dirty = false
 				const dependancies = new Set<Store<any, any[], any>>()
-				value = getter((store) => {
+				value = (getter ?? noRead)((store) => {
 					dependancies.add(store)
 					return store.peek()
 				})

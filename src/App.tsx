@@ -1,24 +1,26 @@
 import { useEffect, useState } from 'react'
 import './App.css'
-import { createScopedStore } from './scoped/reducer'
-import { useStore } from './scoped/store'
+import { useStore } from './stores/store'
+import { family } from './family'
+import { reducer } from './stores/reducer'
 
-const reducer = createScopedStore(
+const red = family(
+	reducer,
 	(n: number) => ({
 		init: n,
-		reduce: (a: number, b) => a + b,
-		result: (n) => n * 2,
+		reduce: (a: number, b: number) => a + b,
+		result: (n: number) => n * 2,
 	}),
 	Infinity,
 )
 
 function selector(n: number) {
-	return n % 2
+	return n
 }
 
 function Reducer({ n }: { n: number }) {
-	useEffect(() => reducer(n).onChange(console.log), [n])
-	const [value, send] = useStore(reducer(n).map(selector))
+	useEffect(() => red(n).onChange(console.log), [n])
+	const [value, send] = useStore(red(n).map(selector))
 	return <button onClick={() => send(3)}>{value}</button>
 }
 
