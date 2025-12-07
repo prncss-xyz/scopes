@@ -1,9 +1,5 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 import type { OnMount, Unmount } from '../family'
-
-export function noRead(): never {
-	throw new Error('Cannot read from a write-only store')
-}
 
 export function noWrite(..._: [never]): never {
 	throw new Error('Cannot write to a read-only store')
@@ -134,34 +130,17 @@ class ChainedStore<Value, V, A extends any[], R> extends Store<V, A, R> {
 	}
 }
 
-export function useStore<Value, Args extends [any, ...any[]], Result>(
-	atom: IStore<Value, Args, Result>,
-) {
-	const { subscribe, peek, send } = atom
-	const value = useSyncExternalStore(subscribe, peek)
-	return [value, send] as const
-}
-
-export function withOnChange<Value, Args extends any[], Result>(
-	atom: IStore<Value, Args, Result>,
-	cb: (value: Value) => void,
-) {
-	const event = () => cb(atom.peek())
-	const unsubscribe = atom.subscribe(event)
-	event()
-	return unsubscribe
-}
-
-export function useStoreEvents<Value, Args extends [any, ...any[]], Result>(
-	atom: IStore<Value, Args, Result>,
-	onChange: (value: Value) => void,
-) {
-	useEffect(() => withOnChange(atom, onChange), [atom, onChange])
-}
-
 export function useStoreValue<Value, Args extends any[], Result>(
-	atom: IStore<Value, Args, Result>,
+	store: Store<Value, Args, Result>,
 ) {
-	const { subscribe, peek } = atom
-	return useSyncExternalStore(subscribe, peek)
+	return useSyncExternalStore(
+		store.subscribe.bind(store),
+		store.peek.bind(store),
+	)
+}
+
+export function useStore<Value, Args extends [any, ...any[]], Result>(
+	store: Store<Value, Args, Result>,
+) {
+	return [useStoreValue(store), store.send.bind(store)] as const
 }

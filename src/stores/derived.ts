@@ -1,6 +1,15 @@
-import type { OnMount } from '../family'
-import { noRead, noWrite, Store } from './store'
+import type { OnMount, Unmount } from '../family'
+import { noop } from '../functions'
+import { Store } from './store'
 import { Subscribed } from './subscribed'
+
+function noRead(): never {
+	throw new Error('Cannot read from a write-only store')
+}
+
+function noWrite(): never {
+	throw new Error(`Cannot write to a read-only store`)
+}
 
 type Read = <Value>(store: Store<Value, any[], any>) => Value
 type Write = <Args extends any[], Result>(
@@ -24,9 +33,14 @@ export function derived<
 ) {
 	return new DerivedStore<Value, Args, Result>(
 		getter ?? noRead,
-		setter ?? (noWrite as never),
+		setter ?? noWrite,
+		noop,
 		onMount,
 	)
+}
+
+export function effect(getter: (read: Read) => Unmount, onMount?: OnMount) {
+	return new EffectStore(getter, onMount)
 }
 
 class DerivedStore<Value, Args extends any[], Result> extends Subscribed<
@@ -36,17 +50,20 @@ class DerivedStore<Value, Args extends any[], Result> extends Subscribed<
 > {
 	private getter
 	private setter
+	private valueCleanup // this is a hook to implement effect
 	dirty = true
 	value: Value = undefined as any
 	storeToUnsubscribe = new Map<Store<any, any[], any>, () => void>()
 	constructor(
 		getter: (read: Read) => Value,
 		setter: (read: Read, write: Write, ...args: Args) => Result,
+		valueCleanup: (value: Value) => void,
 		onMount?: OnMount,
 	) {
 		super(onMount)
 		this.getter = getter
 		this.setter = setter
+		this.valueCleanup = valueCleanup
 	}
 	send(...args: Args) {
 		return this.setter(
@@ -55,9 +72,10 @@ class DerivedStore<Value, Args extends any[], Result> extends Subscribed<
 			...args,
 		)
 	}
-	peek(): Value {
+	peek() {
 		if (this.dirty) {
 			this.dirty = false
+			this.valueCleanup(this.value)
 			const dependancies = new Set<Store<any, any[], any>>()
 			this.value = this.getter((store) => {
 				dependancies.add(store)
@@ -79,5 +97,21 @@ class DerivedStore<Value, Args extends any[], Result> extends Subscribed<
 					)
 		}
 		return this.value
+	}
+}
+
+class EffectStore extends DerivedStore<Unmount, [never], never> {
+	private valueUnmount: Unmount = undefined
+	constructor(getter: (read: Read) => Unmount, onMount?: OnMount) {
+		super(getter, noWrite, () => this.valueUnmount?.(), onMount)
+	}
+	peek() {
+		Promise.resolve().then(() => {
+			this.valueUnmount = super.peek()
+		})
+	}
+	protected unmount(): void {
+		this.valueUnmount?.() // unmount is expected to be called asynchronously
+		super.unmount()
 	}
 }
