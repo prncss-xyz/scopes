@@ -30,9 +30,7 @@ export abstract class Counted<Value, Args extends any[], Result> extends Store<
 		this.size++
 		return () => {
 			this.size--
-			if (this.size === 0) {
-				this.unmount()
-			}
+			if (this.size === 0) this.unmount()
 		}
 	}
 	protected notify() {}
