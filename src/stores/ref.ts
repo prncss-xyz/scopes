@@ -1,40 +1,38 @@
+import type { OnMount } from '../family'
 import { fromInit, setState, type Init, type SetState } from '../functions'
 import { Store } from './store'
+import { Counted } from './subscribed'
 
-export const constant = ref as <Value>(
-	init: Init<Value>,
-	onMount?: () => (() => void) | void,
-) => Store<Value, [never], void>
-
-export function ref<Value>(
-	init: Init<Value>,
-	onMount?: () => (() => void) | void,
-) {
-	let value: Value
-	let count = 0
-	let unmount: (() => void) | void = undefined
-	let dirty = false
-	function makeDirty() {
-		if (dirty) return
-		dirty = true
-		value = fromInit(init)
+class Ref<Value> extends Counted<Value, [SetState<Value>], void> {
+	private init
+	private value: Value = undefined as any
+	private dirty = false
+	constructor(init: Init<Value>, onMount?: OnMount) {
+		super(onMount)
+		this.init = init
 	}
-	return new Store<Value, [SetState<Value>], void>(
-		(next) => {
-			makeDirty()
-			value = setState(next, value)
-		},
-		() => {
-			if (count === 0) unmount = onMount?.()
-			count++
-			return () => {
-				count--
-				if (count === 0) unmount?.()
-			}
-		},
-		() => {
-			makeDirty()
-			return value
-		},
-	)
+	private makeDirty() {
+		if (this.dirty) return
+		this.dirty = true
+		this.value = fromInit(this.init)
+	}
+	send(arg: SetState<Value>) {
+		this.makeDirty()
+		this.value = setState(arg, this.value)
+	}
+	peek() {
+		this.makeDirty()
+		return this.value
+	}
+}
+
+export function ref<Value>(init: Init<Value>, onMount?: OnMount) {
+	return new Ref(init, onMount)
+}
+
+export function constant<Value>(
+	init: Init<Value>,
+	onMount?: OnMount,
+): Store<Value, [never], void> {
+	return new Ref(init, onMount)
 }

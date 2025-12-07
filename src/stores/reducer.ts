@@ -1,6 +1,6 @@
 import type { OnMount } from '../family'
 import { fromInit, id, setState, type Init } from '../functions'
-import { Store } from './store'
+import { Subscribed } from './subscribed'
 
 type ReducerProps<Value, Action, Result> = {
 	init: Init<Value>
@@ -13,7 +13,7 @@ export type Reducer<Props, Value, Action, Result> = (
 ) => ReducerProps<Value, Action, Result>
 
 export function state<Value>(init: Init<Value>, onMount?: OnMount) {
-	return reducer(
+	return new ReducerStore(
 		{
 			init,
 			reduce: setState<Value>,
@@ -23,46 +23,49 @@ export function state<Value>(init: Init<Value>, onMount?: OnMount) {
 	)
 }
 
-export function reducer<Value, Action, Result>(
-	reducer: ReducerProps<Value, Action, Result>,
-	onMount?: OnMount,
+export function reducer<Props, Value, Action, Result>(
+	r: Reducer<Props, Value, Action, Result>,
 ) {
-	let dirty = false
-	let value: Value
-	let reduce: (action: Action, last: Value) => Value
-	let result: (value: Value) => Result
-	let res: Result
-	function makeDirty() {
-		if (dirty) return
-		dirty = true
-		;({ reduce, result } = reducer)
-		value = fromInit(reducer.init)
-		res = result(value)
+	return (props: Props, onMount?: OnMount) => {
+		return new ReducerStore(r(props), onMount)
 	}
-	const subscribers = new Set<() => void>()
-	let unmount: (() => void) | void = undefined
-	return new Store<Result, [Action], void>(
-		(action: Action) => {
-			makeDirty()
-			const last = value
-			value = reduce(action, value)
-			if (Object.is(value, last)) return
-			const nextRes = result(value)
-			res = nextRes
-			subscribers.forEach((fn) => fn())
-		},
-		(cb: () => void) => {
-			if (subscribers.size === 0) unmount = onMount?.()
-			subscribers.add(cb)
-			return () => {
-				subscribers.delete(cb)
-				if (subscribers.size > 0) return
-				unmount?.()
-			}
-		},
-		() => {
-			makeDirty()
-			return res
-		},
-	)
+}
+
+class ReducerStore<Value, Action, Result> extends Subscribed<
+	Result,
+	[Action],
+	void
+> {
+	private init: Init<Value>
+	private reduce: (action: Action, last: Value) => Value
+	private result: (value: Value) => Result
+	private dirty = false
+	private value: Value = undefined as any
+	private res: Result = undefined as any
+	constructor(props: ReducerProps<Value, Action, Result>, onMount?: OnMount) {
+		super(onMount)
+		this.init = props.init
+		this.reduce = props.reduce
+		this.result = props.result
+	}
+	private makeDirty() {
+		if (this.dirty) return
+		this.dirty = true
+		this.value = fromInit(this.init)
+		this.res = this.result(this.value)
+	}
+	send(arg: Action) {
+		this.makeDirty()
+		const nextValue = this.reduce(arg, this.value)
+		if (Object.is(nextValue, this.value)) return
+		this.value = nextValue
+		const nextRes = this.result(nextValue)
+		if (Object.is(nextRes, this.res)) return
+		this.res = nextRes
+		this.notify()
+	}
+	peek() {
+		this.makeDirty()
+		return this.res
+	}
 }
