@@ -1,4 +1,3 @@
-import { useSyncExternalStore } from 'react'
 import type { OnMount, Unmount } from '../family'
 
 export function noWrite(..._: [never]): never {
@@ -128,19 +127,4 @@ class ChainedStore<Value, V, A extends any[], R> extends Store<V, A, R> {
 	peek(): V {
 		return this.getInnerStore().peek()
 	}
-}
-
-export function useStoreValue<Value, Args extends any[], Result>(
-	store: Store<Value, Args, Result>,
-) {
-	return useSyncExternalStore(
-		store.subscribe.bind(store),
-		store.peek.bind(store),
-	)
-}
-
-export function useStore<Value, Args extends [any, ...any[]], Result>(
-	store: Store<Value, Args, Result>,
-) {
-	return [useStoreValue(store), store.send.bind(store)] as const
 }

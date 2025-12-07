@@ -33,5 +33,4 @@ export abstract class Counted<Value, Args extends any[], Result> extends Store<
 			if (this.size === 0) this.unmount()
 		}
 	}
-	protected notify() {}
 }
