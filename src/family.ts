@@ -1,7 +1,7 @@
 import { getHash } from './tanstack-utils'
 
 export type OnMount = () => (() => void) | void
-export type UnMount = ReturnType<OnMount>
+export type Unmount = ReturnType<OnMount>
 
 const handle = 0
 const payload = 1
