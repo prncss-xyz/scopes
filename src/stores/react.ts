@@ -10,7 +10,7 @@ export function useStoreValue<Value, Args extends any[], Result>(
 	)
 }
 
-export function useStore<Value, Args extends [any, ...any[]], Result>(
+export function useStore<Value, Args extends any[], Result>(
 	store: Store<Value, Args, Result>,
 ) {
 	return [useStoreValue(store), store.send.bind(store)] as const
