@@ -1,7 +1,7 @@
 import type { OnMount, Unmount } from '../family'
 import { noop } from '../functions'
 import { Store } from './store'
-import { Subscribed } from './subscribed'
+import { Counted, Subscribed } from './subscribed'
 
 function noRead(): never {
 	throw new Error('Cannot read from a write-only store')
@@ -34,7 +34,6 @@ export function derived<
 	return new DerivedStore<Value, Args, Result>(
 		getter ?? noRead,
 		setter ?? noWrite,
-		noop,
 		onMount,
 	)
 }
@@ -50,20 +49,17 @@ class DerivedStore<Value, Args extends any[], Result> extends Subscribed<
 > {
 	private getter
 	private setter
-	private valueCleanup // this is a hook to implement effect
 	dirty = true
 	value: Value = undefined as any
 	storeToUnsubscribe = new Map<Store<any, any[], any>, () => void>()
 	constructor(
 		getter: (read: Read) => Value,
 		setter: (read: Read, write: Write, ...args: Args) => Result,
-		valueCleanup: (value: Value) => void,
 		onMount?: OnMount,
 	) {
 		super(onMount)
 		this.getter = getter
 		this.setter = setter
-		this.valueCleanup = valueCleanup
 	}
 	send(...args: Args) {
 		return this.setter(
@@ -75,7 +71,6 @@ class DerivedStore<Value, Args extends any[], Result> extends Subscribed<
 	peek() {
 		if (this.dirty) {
 			this.dirty = false
-			this.valueCleanup(this.value)
 			const dependancies = new Set<Store<any, any[], any>>()
 			this.value = this.getter((store) => {
 				dependancies.add(store)
@@ -100,18 +95,32 @@ class DerivedStore<Value, Args extends any[], Result> extends Subscribed<
 	}
 }
 
-class EffectStore extends DerivedStore<Unmount, [never], never> {
-	private valueUnmount: Unmount = undefined
+class EffectStore extends Counted<void, [never], never> {
+	private cleanupEffect: Unmount = undefined
+	private cleanupDerived: Unmount = undefined
+	private derived
 	constructor(getter: (read: Read) => Unmount, onMount?: OnMount) {
-		super(getter, noWrite, () => this.valueUnmount?.(), onMount)
+		super(onMount)
+		this.derived = new DerivedStore(getter, noWrite, noop)
 	}
-	peek() {
-		Promise.resolve().then(() => {
-			this.valueUnmount = super.peek()
-		})
+	peek() {}
+	send(): never {
+		throw new Error('Cannot send to an effect store')
 	}
-	protected unmount(): void {
-		this.valueUnmount?.() // unmount is expected to be called asynchronously
-		super.unmount()
+	protected mount() {
+		this.cleanupDerived = this.derived.subscribe(() =>
+			Promise.resolve().then(() => {
+				this.cleanupEffect?.()
+				this.cleanupEffect = this.derived.peek()
+			}),
+		)
+		this.cleanupEffect = this.derived.peek()
+		super.mount()
+	}
+	protected unmount() {
+		super.unmount
+		this.cleanupEffect?.()
+		this.cleanupEffect = undefined
+		this.cleanupDerived?.()
 	}
 }

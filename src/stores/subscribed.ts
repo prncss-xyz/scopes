@@ -14,6 +14,9 @@ export abstract class Subscribed<
 			if (this.subscribers.size === 0) this.unmount()
 		}
 	}
+	mounted() {
+		return this.subscribers.size > 0
+	}
 	protected notify() {
 		this.subscribers.forEach((cb) => cb())
 	}
@@ -25,6 +28,9 @@ export abstract class Counted<Value, Args extends any[], Result> extends Store<
 	Result
 > {
 	private size = 0
+	mounted() {
+		return this.size > 0
+	}
 	subscribe() {
 		if (this.size === 0) this.mount()
 		this.size++

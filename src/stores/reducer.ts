@@ -5,7 +5,7 @@ import { Subscribed } from './subscribed'
 type ReducerProps<Value, Action, Result> = {
 	init: Init<Value>
 	reduce: (action: Action, last: Value) => Value
-	result: (value: Value) => Result
+	result?: (value: Value) => Result
 }
 
 export type Reducer<Props, Value, Action, Result> = (
@@ -23,30 +23,32 @@ export function state<Value>(init: Init<Value>, onMount?: OnMount) {
 	)
 }
 
-export function reducer<Props, Value, Action, Result>(
-	r: Reducer<Props, Value, Action, Result>,
+export function reducer<Value, Action, Result = Value>(
+	props: ReducerProps<Value, Action, Result>,
+	onMount?: OnMount,
 ) {
-	return (props: Props, onMount?: OnMount) => {
-		return new ReducerStore(r(props), onMount)
-	}
+	return new ReducerStore(props, onMount)
 }
 
-class ReducerStore<Value, Action, Result> extends Subscribed<
+export class ReducerStore<Value, Action, Result> extends Subscribed<
 	Result,
 	[Action],
 	void
 > {
-	private init: Init<Value>
-	private reduce: (action: Action, last: Value) => Value
-	private result: (value: Value) => Result
+	private init
+	private reduce
+	private result
 	private dirty = false
-	private value: Value = undefined as any
-	private res: Result = undefined as any
-	constructor(props: ReducerProps<Value, Action, Result>, onMount?: OnMount) {
+	protected value: Value = undefined as never
+	private res: Result = undefined as never
+	constructor(
+		props: ReducerProps<Value, Action, Result>,
+		onMount?: OnMount,
+	) {
 		super(onMount)
 		this.init = props.init
 		this.reduce = props.reduce
-		this.result = props.result
+		this.result = props.result ?? (id as never)
 	}
 	private makeDirty() {
 		if (this.dirty) return
