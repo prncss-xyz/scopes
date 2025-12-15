@@ -14,7 +14,7 @@ export abstract class Subscribed<
 			if (this.subscribers.size === 0) this.unmount()
 		}
 	}
-	mounted() {
+	isMounted() {
 		return this.subscribers.size > 0
 	}
 	protected notify() {
@@ -28,7 +28,7 @@ export abstract class Counted<Value, Args extends any[], Result> extends Store<
 	Result
 > {
 	private size = 0
-	mounted() {
+	isMounted() {
 		return this.size > 0
 	}
 	subscribe() {
@@ -38,5 +38,16 @@ export abstract class Counted<Value, Args extends any[], Result> extends Store<
 			this.size--
 			if (this.size === 0) this.unmount()
 		}
+	}
+}
+
+export class Observable<Value> {
+	private subscribers = new Set<(value: Value) => void>()
+	onValue(cb: (value: Value) => void) {
+		this.subscribers.add(cb)
+		return () => this.subscribers.delete(cb)
+	}
+	emit(value: Value) {
+		this.subscribers.forEach((cb) => cb(value))
 	}
 }

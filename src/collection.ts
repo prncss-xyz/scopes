@@ -1,14 +1,11 @@
 import { getHash } from './tanstack-utils'
-
-export type OnMount = () => (() => void) | void
-export type Unmount = ReturnType<OnMount>
+import type { OnMount } from './types'
 
 const handle = 0
 const payload = 1
 
-export function family<Key, Props, Payload>(
-	factory: (props: Props, onMount?: OnMount) => Payload,
-	create: (key: Key) => Props,
+export function collection<Key, Payload>(
+	factory: (key: Key, onMount?: OnMount) => Payload,
 	ttl = 0,
 ): (key: Key) => Payload {
 	type Entry = [number, Payload]
@@ -26,7 +23,7 @@ export function family<Key, Props, Payload>(
 		const created = [
 			0,
 			factory(
-				create(key),
+				key,
 				ttl === Infinity
 					? undefined
 					: () => {

@@ -1,5 +1,5 @@
-import type { OnMount } from '../family'
 import { fromInit, setState, type Init, type SetState } from '../functions'
+import type { OnMount } from '../types'
 import { Store } from './store'
 import { Counted } from './subscribed'
 

@@ -97,30 +97,30 @@ class DerivedStore<Value, Args extends any[], Result> extends Subscribed<
 
 class EffectStore extends Counted<void, [never], never> {
 	private cleanupEffect: Unmount = undefined
-	private cleanupDerived: Unmount = undefined
-	private derived
+	private cleanupHandler: Unmount = undefined
+	private handler
 	constructor(getter: (read: Read) => Unmount, onMount?: OnMount) {
 		super(onMount)
-		this.derived = new DerivedStore(getter, noWrite, noop)
+		this.handler = new DerivedStore(getter, noWrite, noop)
 	}
 	peek() {}
 	send(): never {
 		throw new Error('Cannot send to an effect store')
 	}
 	protected mount() {
-		this.cleanupDerived = this.derived.subscribe(() =>
+		this.cleanupHandler = this.handler.subscribe(() =>
+			// TODO: does this need to be async?
 			Promise.resolve().then(() => {
 				this.cleanupEffect?.()
-				this.cleanupEffect = this.derived.peek()
+				this.cleanupEffect = this.handler.peek()
 			}),
 		)
-		this.cleanupEffect = this.derived.peek()
-		super.mount()
+		this.cleanupEffect = this.handler.peek()
 	}
 	protected unmount() {
 		super.unmount
 		this.cleanupEffect?.()
 		this.cleanupEffect = undefined
-		this.cleanupDerived?.()
+		this.cleanupHandler?.()
 	}
 }

@@ -21,7 +21,7 @@ export abstract class Store<Value, Args extends any[], Result>
 	constructor(onMount?: OnMount) {
 		this.uOnmount = onMount
 	}
-	protected mount(): Unmount {
+	protected mount() {
 		this.uUnmount = this.uOnmount?.()
 	}
 	protected unmount() {

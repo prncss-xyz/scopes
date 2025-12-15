@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 import { useStore } from './stores/store'
-import { family } from './family'
+import { collection } from './collection'
 import { reducer } from './stores/reducer'
 
-const red = family(
+const red = collection(
 	reducer,
 	(n: number) => ({
 		init: n,

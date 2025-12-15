@@ -1,14 +1,17 @@
-// TODO: hydrate
-// TODO: cancel pending queries
+// TODO: hydrate TODO: cancel pending queries
+
+import { exhaustive, isFunction, type SetState } from '../../functions'
 
 // default staleTime 0 ms
 // default ttl 5 * 60 * 1000 ms
 
-import { exhaustive, isFunction, type SetState } from '../../functions'
-
 type State<Data> = (
 	| {
-			type: 'pending' | 'disabled' | 'error'
+			type: 'pending' | 'disabled'
+	  }
+	| {
+			type: 'error'
+			payload: unknown
 	  }
 	| {
 			type: 'success'
@@ -48,10 +51,17 @@ type Event<Data> =
 				  }
 				| {
 						type: 'error'
+						payload: unknown
 				  }
 	  }
 
-export function queryMachine<Data>({ staleTime }: { staleTime?: number }) {
+export function queryMachine<Data>({
+	query,
+	staleTime,
+}: {
+	query: () => Promise<Data>
+	staleTime?: number
+}) {
 	const reset: State<Data> = {
 		type: 'pending',
 		fetching: false,
@@ -114,8 +124,35 @@ export function queryMachine<Data>({ staleTime }: { staleTime?: number }) {
 	return {
 		init,
 		reduce,
-		effects: {
-			_fetch: ({ fetching }: State<Data>) =>fetching,
+		onChange:
+			(send: (event: Event<Data>) => void) =>
+			(next: State<Data>, last: State<Data>) => {
+				if (!last.fetching && next.fetching) {
+					query()
+						.then((data) =>
+							send({
+								type: '_fetch',
+								payload: {
+									type: 'success',
+									payload: { data, since: Date.now() },
+								},
+							}),
+						)
+						.catch((payload) =>
+							send({ type: '_fetch', payload: { type: 'error', payload } }),
+						)
+				}
+			},
+		onMount: (send: (event: Event<Data>) => void) => {
+			send({
+				type: '_onMount',
+				payload: { type: 'mount', payload: Date.now() },
+			})
+			return () =>
+				send({
+					type: '_onMount',
+					payload: { type: 'unmount' },
+				})
 		},
 	}
 }
