@@ -1,4 +1,4 @@
-import { collection } from '../../collection'
+import { familly } from '../../collection'
 import { createMachine } from '../machine'
 import { queryMachine } from './machine'
 
@@ -14,15 +14,13 @@ export function query<Props, Value>({
 	ttl?: number
 	fn: (props: Props) => Promise<Value>
 }) {
-	return collection(
-		(props: Props, onMount) =>
-			createMachine(
-				queryMachine({
-					staleTime: staleTime ?? defaultStaleTime,
-					query: () => fn(props),
-				}),
-				onMount,
-			),
+	return familly(
+		createMachine,
+		(props: Props) =>
+			queryMachine({
+				staleTime: staleTime ?? defaultStaleTime,
+				query: () => fn(props),
+			}),
 		ttl ?? defaultTTL,
 	)
 }

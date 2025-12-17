@@ -1,4 +1,4 @@
-import type { OnMount, Unmount } from '../family'
+import type { OnMount, Unmount } from '../mount'
 
 export function noWrite(..._: [never]): never {
 	throw new Error('Cannot write to a read-only store')

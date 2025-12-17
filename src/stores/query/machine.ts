@@ -1,13 +1,10 @@
 // TODO: hydrate TODO: cancel pending queries
 
-import { exhaustive, isFunction, type SetState } from '../../functions'
-
-// default staleTime 0 ms
-// default ttl 5 * 60 * 1000 ms
+import { exhaustive, type Modify } from '../../functions'
 
 type State<Data> = (
 	| {
-			type: 'pending' | 'disabled'
+			type: 'pending'
 	  }
 	| {
 			type: 'error'
@@ -27,9 +24,9 @@ type State<Data> = (
 
 type Event<Data> =
 	| {
-			type: 'reset' | 'invalidate' | 'prefetch' | 'enable'
+			type: 'reset' | 'invalidate' | 'prefetch'
 	  }
-	| { type: 'update'; payload: SetState<Data> }
+	| { type: 'update'; payload: Modify<Data> }
 	| {
 			type: '_onMount'
 			payload:
@@ -40,19 +37,15 @@ type Event<Data> =
 				| { type: 'unmount' }
 	  }
 	| {
-			type: '_fetch'
-			payload:
-				| {
-						type: 'success'
-						payload: {
-							data: Data
-							since: number
-						}
-				  }
-				| {
-						type: 'error'
-						payload: unknown
-				  }
+			type: 'success'
+			payload: {
+				data: Data
+				since: number
+			}
+	  }
+	| {
+			type: 'error'
+			payload: unknown
 	  }
 
 export function queryMachine<Data>({
@@ -73,27 +66,14 @@ export function queryMachine<Data>({
 	function reduce(event: Event<Data>, state: State<Data>): State<Data> {
 		switch (event.type) {
 			case 'update':
-				if (isFunction(event.payload)) {
-					if (state.type === 'success') {
-						const data = event.payload(state.payload.data)
-						if (!Object.is(data, state.payload.data)) {
-							return { ...state, payload: { ...state.payload, data } }
-						}
-					}
-					return state
+				if (state.type === 'success') {
+					const data = event.payload(state.payload.data)
+					if (!Object.is(data, state.payload.data))
+						return { ...state, payload: { ...state.payload, data } }
 				}
-				return {
-					...state,
-					type: 'success',
-					payload: { data: event.payload, since: -Infinity },
-				}
-			case 'enable':
-				if (state.type === 'disabled')
-					return { ...state, type: 'pending', fetching: state.mounted }
 				return state
 			case 'prefetch':
-				if (state.type === 'pending' || state.type === 'disabled')
-					return { ...state, fetching: true }
+				if (state.type === 'pending') return { ...state, fetching: true }
 				return state
 			case 'invalidate':
 				if (state.type === 'success') {
@@ -107,8 +87,9 @@ export function queryMachine<Data>({
 					fetching: state.mounted,
 					mounted: state.mounted,
 				}
-			case '_fetch':
-				return { ...event.payload, mounted: state.mounted, fetching: false }
+			case 'success':
+			case 'error':
+				return { ...event, mounted: state.mounted, fetching: false }
 			case '_onMount':
 				if (
 					state.type === 'success' &&
@@ -131,15 +112,15 @@ export function queryMachine<Data>({
 					query()
 						.then((data) =>
 							send({
-								type: '_fetch',
-								payload: {
-									type: 'success',
-									payload: { data, since: Date.now() },
-								},
+								type: 'success',
+								payload: { data, since: Date.now() },
 							}),
 						)
 						.catch((payload) =>
-							send({ type: '_fetch', payload: { type: 'error', payload } }),
+							send({
+								type: 'error',
+								payload,
+							}),
 						)
 				}
 			},

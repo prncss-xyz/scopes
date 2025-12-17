@@ -1,2 +1,3 @@
-export type OnMount = () => (() => void) | void
-export type Unmount = ReturnType<OnMount>
+export type Prettify<T> = {
+	[K in keyof T]: T[K]
+} & {}

@@ -1,12 +1,20 @@
+import type { OnMount } from './mount'
 import { getHash } from './tanstack-utils'
-import type { OnMount } from './types'
 
 const handle = 0
 const payload = 1
 
+export function familly<Key, Props, Payload>(
+	template: (props: Props, onMount?: OnMount) => Payload,
+	factory: (key: Key) => Props,
+	ttl = 0,
+) {
+	return collection((key: Key) => template(factory(key)), ttl)
+}
+
 export function collection<Key, Payload>(
 	factory: (key: Key, onMount?: OnMount) => Payload,
-	ttl = 0,
+	ttl: number,
 ): (key: Key) => Payload {
 	type Entry = [number, Payload]
 	const store = new Map<string, Entry>()
@@ -26,11 +34,8 @@ export function collection<Key, Payload>(
 				key,
 				ttl === Infinity
 					? undefined
-					: () => {
-							return () => {
-								created[handle] = setTimeout(() => store.delete(hash), ttl)
-							}
-						},
+					: () => () =>
+							(created[handle] = setTimeout(() => store.delete(hash), ttl)),
 			),
 		] as Entry
 		store.set(hash, created)

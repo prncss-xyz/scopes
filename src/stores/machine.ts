@@ -1,5 +1,5 @@
 import type { Init } from '../functions'
-import type { OnMount } from '../types'
+import { composeMount, type OnMount } from '../mount'
 import { reducer } from './reducer'
 
 // TODO: act is required when Action is not never
@@ -29,21 +29,18 @@ export function createMachine<State, Event, Action, Result>(
 				Promise.resolve().then(() => machine.act!(action))
 			}
 		: noAct
+	const onChange = machine.onChange?.(lazySend)
 	const res = reducer(
 		{
 			init: machine.init,
-			reduce: (event: Event, last) => machine.reduce(event, last, act),
+			reduce: (event: Event, last) => {
+				const next = machine.reduce(event, last, act)
+				if (onChange) Promise.resolve().then(() => onChange(next, last))
+				return next
+			},
 			result: machine.result,
-			onChange: machine.onChange?.(lazySend),
 		},
-		() => {
-			const cleanup = onMount?.()
-			machine
-
-			return () => {
-				return cleanup
-			}
-		},
+		composeMount(onMount, machine.onMount?.(lazySend)),
 	)
 	send = res.send.bind(res)
 	return res
