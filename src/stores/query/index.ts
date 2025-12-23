@@ -10,9 +10,9 @@ const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
 
 // TODO: hydrate
+// TODO: mutations
 // TODO: cancel pending queries
 // TODO: sync equivalent
-// TODO: preserve state in dev
 // TODO: derived: promises
 // TODO: user send function: replace del action, add now to success
 
@@ -85,7 +85,7 @@ export function query<Props, Data, Suspend = true>({
 									})
 								return
 							case 'data':
-								observable.emit(props, action.payload.next, action.payload.next)
+								observable.emit(props, action.payload.next, action.payload.last)
 								return
 							case 'delete':
 								if (!del) return

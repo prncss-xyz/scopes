@@ -1,9 +1,13 @@
 import { type StorageProps } from '.'
-import { isReset } from '../../functions'
+import { fromInit, isReset, type Init } from '../../functions'
 
-function delayed<Value>(value: Value, delay?: number) {
+export function delayed<Value = void>(delay: number, value?: Init<Value>) {
 	return new Promise<Value>((resolve) => {
-		setTimeout(() => resolve(value), delay ?? 0)
+		setTimeout(
+			() =>
+				resolve(value === undefined ? (undefined as never) : fromInit(value)),
+			delay ?? 0,
+		)
 	})
 }
 
@@ -18,17 +22,15 @@ export function memoryStorage<Key, Data>({
 	const storage = new Map<Key, Data>()
 	return {
 		get: (key) =>
-			delayed(storage.has(key) ? storage.get(key)! : getDefault(key), delay),
+			delayed(delay, storage.has(key) ? storage.get(key)! : getDefault(key)),
 		set: (key, value) => {
-			console.log('set', key, value)
 			if (isReset(value)) {
 				storage.delete(key)
-
 			} else storage.set(key, value)
 		},
-    del: (key) => {
-      storage.delete(key)
-      return getDefault(key)
-    }
+		del: (key) => {
+			storage.delete(key)
+			return getDefault(key)
+		},
 	}
 }
