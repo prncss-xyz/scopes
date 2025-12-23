@@ -14,7 +14,22 @@ const storage = memoryStorage({
 storage.observe((key, next, last) => console.log(key, next, last))
 
 function Json({ children }: { children: unknown }) {
-	return <pre>{JSON.stringify(children, null, 2)}</pre>
+	const safe = (value: unknown) => {
+		try {
+			const seen = new WeakSet<object>();
+			return JSON.stringify(value, (_k, v) => {
+				if (typeof v === 'object' && v !== null) {
+					if (seen.has(v as object)) return '[Circular]';
+					seen.add(v as object);
+				}
+				if (typeof v === 'function') return v.toString();
+				return v;
+			}, 2);
+		} catch {
+			return String(value);
+		}
+	};
+	return <pre>{safe(children)}</pre>;
 }
 
 function Suspended({ prop }: { prop: string }) {
@@ -23,13 +38,13 @@ function Suspended({ prop }: { prop: string }) {
 	return (
 		<Card>
 			<Heading size='3'>{prop}</Heading>
-			<Json> {value} </Json>
+			<Json>{value}</Json>
 		</Card>
 	)
 }
 
 function Item({ prop }: { prop: string }) {
-	const value = useStoreValue(storage.get(prop))
+	const value = useStoreValue(storage.raw(prop))
 	return (
 		<Card>
 			<Heading size='3'>{prop}</Heading>

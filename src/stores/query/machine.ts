@@ -99,7 +99,7 @@ export function queryMachine<Data>() {
 						? state.payload.promise
 						: Promise.resolve(event.payload.data)
 				return {
-          type: 'success',
+					type: 'success',
 					payload: { ...event.payload, promise },
 					mounted: state.mounted,
 					fetching: false,

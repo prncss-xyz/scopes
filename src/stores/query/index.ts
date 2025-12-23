@@ -36,7 +36,7 @@ export function query<Props, Data>({
 	>()
 	ttl ??= defaultTTL
 	staleTime ??= defaultStaleTime
-	const c = collection(
+	const raw = collection(
 		(props: Props, onMount) => {
 			const r = reducer(
 				{
@@ -82,7 +82,7 @@ export function query<Props, Data>({
 			observe
 				? () =>
 						observe((p, data) =>
-							c(p).send({
+							raw(p).send({
 								type: 'success',
 								payload: { data, since: Date.now() },
 							}),
@@ -91,8 +91,10 @@ export function query<Props, Data>({
 		),
 	)
 	return {
-		get: c,
-		suspend: (props: Props) => c(props).map(suspend),
+		raw,
+		suspend: (props: Props) => {
+			return raw(props).map(suspend)
+		},
 		observe: observable.observe.bind(observable),
 	}
 }
