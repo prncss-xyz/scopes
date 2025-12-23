@@ -20,30 +20,24 @@ export class PrimitiveStore<Value>
 	implements ValueStore<Value>
 {
 	#init
-	#dirty = false
+	#pristine = true
 	#value: Value = undefined as never
 	constructor(init: Init<Value>, onMount?: OnMount) {
 		super(onMount)
 		this.#init = init
 	}
-	#makeDirty() {
-		if (this.#dirty) return
-		this.#dirty = true
-		this.#value = fromInit(this.#init)
-	}
 	send(arg: SetStateWithReset<Value>) {
 		if (isReset(arg)) {
-			if (!this.#dirty) return
-			this.#dirty = true
+			if (this.#pristine) return
+			this.#pristine = false
 			this.notify()
 			return
 		}
 		let nextValue: Value
 		if (isFunction(arg)) {
-			this.#makeDirty()
-			nextValue = arg(this.#value)
+			nextValue = arg(this.peek())
 		} else {
-			this.#dirty = true
+			this.#pristine = false
 			nextValue = arg
 		}
 		if (Object.is(nextValue, this.#value)) return
@@ -51,7 +45,10 @@ export class PrimitiveStore<Value>
 		this.notify()
 	}
 	peek() {
-		this.#makeDirty()
+		if (this.#pristine) {
+			this.#pristine = false
+			this.#value = fromInit(this.#init)
+		}
 		return this.#value
 	}
 }

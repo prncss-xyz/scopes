@@ -125,7 +125,6 @@ export function query<Props, Data, Suspend = true>({
 	)
 	return {
 		get: raw,
-		suspend: (props: Props) => suspended(raw(props)),
 		observe: observable.observe.bind(observable),
 	}
 }
