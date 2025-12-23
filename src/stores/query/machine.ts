@@ -28,7 +28,13 @@ export type State<Data> = (
 
 export type Event<Data> =
 	| {
-			type: 'reset' | 'invalidate' | 'prefetch' | 'cancel' | 'unmount'
+			type:
+				| 'reset'
+				| 'invalidate'
+				| 'prefetch'
+				| 'cancel'
+				| 'unmount'
+				| 'delete'
 	  }
 	| { type: 'update'; payload: Modify<Data> }
 	| {
@@ -55,7 +61,7 @@ export type Action<Data> =
 				last: Data | Reset
 			}
 	  }
-	| { type: 'fetch' | 'cancel' }
+	| { type: 'fetch' | 'cancel' | 'delete' }
 
 export function queryMachine<Data>() {
 	function init(): State<Data> {
@@ -66,7 +72,11 @@ export function queryMachine<Data>() {
 			payload: Promise.withResolvers<Data>(),
 		}
 	}
-	function reduce0(event: Event<Data>, state: State<Data>): State<Data> {
+	function reduce0(
+		event: Event<Data>,
+		state: State<Data>,
+		act: (action: Action<Data>) => void,
+	): State<Data> {
 		switch (event.type) {
 			case 'cancel':
 				return { ...state, fetching: false }
@@ -116,6 +126,9 @@ export function queryMachine<Data>() {
 				}
 			case 'unmount':
 				return { ...state, mounted: false }
+			case 'delete':
+				act({ type: 'delete' })
+				return state
 			default:
 				return exhaustive(event)
 		}
@@ -125,7 +138,7 @@ export function queryMachine<Data>() {
 		last: State<Data>,
 		act: (action: Action<Data>) => void,
 	) {
-		const next = reduce0(event, last)
+		const next = reduce0(event, last, act)
 		if (next.fetching && !last.fetching) act({ type: 'fetch' })
 		if (next.type === 'success' && last.type === 'pending')
 			last.payload.resolve(next.payload.data)

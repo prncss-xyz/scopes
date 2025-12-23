@@ -3,12 +3,13 @@ import {
 	isFunction,
 	isReset,
 	type Init,
+	type Reset,
 	type SetStateWithReset,
 } from '../functions'
 import type { OnMount } from '../mount'
 import { Subscribed } from './subscribed'
 
-export type ValueStore<Value> = Subscribed<Value, [Value], void>
+export type ValueStore<Value> = Subscribed<Value, [Value | Reset], void>
 
 export function primitive<Value>(init: Init<Value>, onMount?: OnMount) {
 	return new PrimitiveStore(init, onMount)

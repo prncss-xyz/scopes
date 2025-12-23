@@ -9,7 +9,6 @@ const storage = query({
 	staleTime: Infinity,
 	api: memoryStorage({
 		getDefault: () => 'default',
-		isDefault: (value) => value === 'default',
 	}),
 	suspend: true,
 })
@@ -42,7 +41,7 @@ function Json({ children }: { children: unknown }) {
 function Item({ prop }: { prop: string }) {
 	const [raw, send] = useStore(storage.get(prop))
 	// const value = raw.type === 'success' ? raw.payload.data : 'loading'
-  const value = raw
+	const value = raw
 	return (
 		<Card>
 			<Heading size='3'>{prop}</Heading>
@@ -56,6 +55,15 @@ function Item({ prop }: { prop: string }) {
 				}
 			>
 				+
+			</Button>
+			<Button
+				onClick={() =>
+					send({
+						type: 'delete',
+					})
+				}
+			>
+				x
 			</Button>
 		</Card>
 	)

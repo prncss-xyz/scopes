@@ -1,7 +1,7 @@
 import { collection } from '../../collection'
 import { queryMachine, type Action, type State, type Event } from './machine'
 import { reducer, ReducerStore } from '../reducer'
-import { exhaustive, RESET, type Reset } from '../../functions'
+import { exhaustive, type Reset } from '../../functions'
 import { composeMount, type OnMount } from '../../mount'
 import { Observable } from '../subscribed'
 import { Suspended, suspended } from './suspended'
@@ -13,17 +13,20 @@ const defaultStaleTime = 0
 // TODO: cancel pending queries
 // TODO: sync equivalent
 // TODO: preserve state in dev
+// TODO: derived: promises
+// TODO: user send function: replace del action, add now to success
 
 export interface StorageProps<Props, Data> {
 	get?: (props: Props) => Promise<Data>
 	set?: (props: Props, value: Data) => void
+	del?: (props: Props) => Data
 	observe?: (emit: (props: Props, value: Data) => void) => () => void
 }
 
 export type QueryProps<Props, Data, Suspend = true> = {
 	ttl?: number
 	staleTime?: number
-  api: StorageProps<Props, Data>
+	api: StorageProps<Props, Data>
 	onMount?: OnMount
 	suspend?: Suspend
 }
@@ -33,11 +36,7 @@ export function query<Props, Data>(
 ): {
 	get: (key: Props) => Suspended<Data>
 	observe: (
-		cb: (
-			props: Props,
-			next: Data | typeof RESET,
-			last: Data | typeof RESET,
-		) => void,
+		cb: (props: Props, next: Data | Reset, last: Data | Reset) => void,
 	) => () => boolean
 }
 export function query<Props, Data>(
@@ -47,17 +46,13 @@ export function query<Props, Data>(
 		key: Props,
 	) => ReducerStore<State<Data>, Event<Data>, State<Data>, Action<Data>>
 	observe: (
-		cb: (
-			props: Props,
-			next: Data | typeof RESET,
-			last: Data | typeof RESET,
-		) => void,
+		cb: (props: Props, next: Data | Reset, last: Data | Reset) => void,
 	) => () => boolean
 }
 export function query<Props, Data, Suspend = true>({
 	ttl,
 	staleTime,
-  api: { get, set, observe },
+	api: { get, set, del, observe },
 	onMount,
 	suspend,
 }: QueryProps<Props, Data, Suspend>) {
@@ -91,6 +86,13 @@ export function query<Props, Data, Suspend = true>({
 								return
 							case 'data':
 								observable.emit(props, action.payload.next, action.payload.next)
+								return
+							case 'delete':
+								if (!del) return
+								r.send({
+									type: 'success',
+									payload: { data: del(props), since: Date.now() },
+								})
 								return
 							default:
 								exhaustive(action)
