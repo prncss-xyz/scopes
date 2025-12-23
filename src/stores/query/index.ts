@@ -10,7 +10,6 @@ const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
 
 // TODO: hydrate
-// TODO: mutations
 // TODO: cancel pending queries
 // TODO: sync equivalent
 // TODO: derived: promises

@@ -1,6 +1,6 @@
 export function assertion(
-	condition: boolean,
+	condition: unknown,
 	message?: string,
 ): asserts condition {
-	if (condition === false) throw new Error(message ?? 'Assertion failed')
+	if (!condition) throw new Error(message ?? 'Assertion failed')
 }

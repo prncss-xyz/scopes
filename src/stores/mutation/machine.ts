@@ -39,7 +39,7 @@ export function mutationMachine<Props>() {
 			case 'success':
 				return { type: 'success' }
 			case 'cancel':
-				if (state.type === 'pending') return state
+				if (state.type !== 'pending') return state
 				act({ type: 'cancel' })
 				return { ...state, type: 'idle' }
 			default:

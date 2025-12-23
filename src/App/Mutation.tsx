@@ -7,8 +7,9 @@ import { delayed } from '../stores/query/memory'
 export function Mutation() {
 	const [state, send] = useStore(
 		mutation({
-			mutate: async () => {
+			mutate: async (_props, signal) => {
 				await delayed(1000)
+				if (signal.aborted) return undefined as never
 				const value = Math.floor(Math.random() * 100)
 				if (value % 2 === 0) throw new Error('even error')
 				return value
@@ -20,8 +21,17 @@ export function Mutation() {
 	return (
 		<Card>
 			<Heading size='1'>Mutation</Heading>
-			<Button onClick={() => send({ type: 'mutate', payload: undefined })}>
+			<Button
+				disabled={state.type === 'pending'}
+				onClick={() => send({ type: 'mutate', payload: undefined })}
+			>
 				Mutate
+			</Button>
+			<Button
+				disabled={state.type !== 'pending'}
+				onClick={() => send({ type: 'cancel' })}
+			>
+				Cancel
 			</Button>
 			<Json>{state}</Json>
 		</Card>
