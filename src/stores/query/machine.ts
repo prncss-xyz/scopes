@@ -1,10 +1,13 @@
-// TODO: hydrate TODO: cancel pending queries
+import { exhaustive, RESET, type Modify, type Reset } from '../../functions'
 
-import { exhaustive, type Modify } from '../../functions'
-
-type State<Data> = (
+export type State<Data> = (
 	| {
 			type: 'pending'
+			payload: {
+				resolve: (data: Data) => void
+				reject: (error: unknown) => void
+				promise: Promise<Data>
+			}
 	  }
 	| {
 			type: 'error'
@@ -15,6 +18,7 @@ type State<Data> = (
 			payload: {
 				data: Data
 				since: number
+				promise: Promise<Data>
 			}
 	  }
 ) & {
@@ -22,19 +26,14 @@ type State<Data> = (
 	fetching: boolean
 }
 
-type Event<Data> =
+export type Event<Data> =
 	| {
-			type: 'reset' | 'invalidate' | 'prefetch'
+			type: 'reset' | 'invalidate' | 'prefetch' | 'cancel' | 'unmount'
 	  }
 	| { type: 'update'; payload: Modify<Data> }
 	| {
-			type: '_onMount'
-			payload:
-				| {
-						type: 'mount'
-						payload: number
-				  }
-				| { type: 'unmount' }
+			type: 'mount'
+			payload: number
 	  }
 	| {
 			type: 'success'
@@ -48,28 +47,34 @@ type Event<Data> =
 			payload: unknown
 	  }
 
-export function queryMachine<Data>({
-	query,
-	staleTime,
-}: {
-	query: () => Promise<Data>
-	staleTime?: number
-}) {
-	const reset: State<Data> = {
-		type: 'pending',
-		fetching: false,
-		mounted: false,
+export type Action<Data> =
+	| {
+			type: 'data'
+			payload: {
+				next: Data | Reset
+				last: Data | Reset
+			}
+	  }
+	| { type: 'fetch' | 'cancel' }
+
+export function queryMachine<Data>() {
+	function init(): State<Data> {
+		return {
+			type: 'pending',
+			fetching: false,
+			mounted: false,
+			payload: Promise.withResolvers<Data>(),
+		}
 	}
-	function init() {
-		return reset
-	}
-	function reduce(event: Event<Data>, state: State<Data>): State<Data> {
+	function reduce0(event: Event<Data>, state: State<Data>): State<Data> {
 		switch (event.type) {
+			case 'cancel':
+				return { ...state, fetching: false }
 			case 'update':
 				if (state.type === 'success') {
 					const data = event.payload(state.payload.data)
-					if (!Object.is(data, state.payload.data))
-						return { ...state, payload: { ...state.payload, data } }
+					if (Object.is(data, state.payload.data)) return state
+					return { ...state, payload: { ...state.payload, data } }
 				}
 				return state
 			case 'prefetch':
@@ -86,54 +91,55 @@ export function queryMachine<Data>({
 					type: 'pending',
 					fetching: state.mounted,
 					mounted: state.mounted,
+					payload: Promise.withResolvers<Data>(),
 				}
 			case 'success':
+				const promise =
+					state.type === 'pending'
+						? state.payload.promise
+						: Promise.resolve(event.payload.data)
+				return {
+          type: 'success',
+					payload: { ...event.payload, promise },
+					mounted: state.mounted,
+					fetching: false,
+				}
 			case 'error':
 				return { ...event, mounted: state.mounted, fetching: false }
-			case '_onMount':
-				if (
-					state.type === 'success' &&
-					event.payload.type === 'mount' &&
-					event.payload.payload - state.payload.since > (staleTime ?? 0)
-				)
-					return { ...state, fetching: true, mounted: true }
-				return { ...state, mounted: event.payload.type === 'mount' }
+			case 'mount':
+				return {
+					...state,
+					fetching: !(
+						state.type === 'success' && event.payload < state.payload.since
+					),
+					mounted: true,
+				}
+			case 'unmount':
+				return { ...state, mounted: false }
 			default:
 				return exhaustive(event)
 		}
 	}
+	function reduce(
+		event: Event<Data>,
+		last: State<Data>,
+		act: (action: Action<Data>) => void,
+	) {
+		const next = reduce0(event, last)
+		if (next.fetching && !last.fetching) act({ type: 'fetch' })
+		if (next.type === 'success' && last.type === 'pending')
+			last.payload.resolve(next.payload.data)
+		if (next.type === 'error' && last.type === 'pending')
+			last.payload.reject(next.payload)
+		const lastData = last.type === 'success' ? last.payload.data : RESET
+		const nextData = next.type === 'success' ? next.payload.data : RESET
+		if (!Object.is(nextData, lastData)) {
+			act({ type: 'data', payload: { next: nextData, last: lastData } })
+		}
+		return next
+	}
 	return {
 		init,
 		reduce,
-		onChange:
-			(send: (event: Event<Data>) => void) =>
-			(next: State<Data>, last: State<Data>) => {
-				if (!last.fetching && next.fetching) {
-					query()
-						.then((data) =>
-							send({
-								type: 'success',
-								payload: { data, since: Date.now() },
-							}),
-						)
-						.catch((payload) =>
-							send({
-								type: 'error',
-								payload,
-							}),
-						)
-				}
-			},
-		onMount: (send: (event: Event<Data>) => void) => {
-			send({
-				type: '_onMount',
-				payload: { type: 'mount', payload: Date.now() },
-			})
-			return () =>
-				send({
-					type: '_onMount',
-					payload: { type: 'unmount' },
-				})
-		},
 	}
 }

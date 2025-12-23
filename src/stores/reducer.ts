@@ -1,70 +1,85 @@
-import { fromInit, id, setState, type Init } from '../functions'
-import type { OnMount } from '../mount'
-import { Subscribed } from './subscribed'
+import { noop, type Init } from '../functions'
+import { type OnMount } from '../mount'
+import { primitive, type ValueStore } from './primitive'
+import { Store } from './store'
 
-export interface ReducerProps<Value, Action, Result> {
-	init: Init<Value>
-	reduce: (action: Action, last: Value) => Value
-	result?: (value: Value) => Result
+export type Reducer<Props, State, Event, Result, Action> = (
+	props: Props,
+) => ReducerValues<State, Event, Result, Action>
+
+interface ReducerValues<State, Event, Result, Action> {
+	init: Init<State>
+	reduce: (event: Event, last: State, act: (action: Action) => void) => State
+	result?: (value: State) => Result
 }
 
-export type Reducer<Props, Value, Action, Result> = (
-	props: Props,
-) => ReducerProps<Value, Action, Result>
+export type ReducerProps<State, Event, Result, Action> = {
+	reducer: ReducerValues<State, Event, Result, Action>
+	createStore?: (init: Init<State>, onMount?: OnMount) => ValueStore<State>
+} & (never extends Action ? { act: (action: Action) => void } : {}) // FIXME:
 
-export function state<Value>(init: Init<Value>, onMount?: OnMount) {
+export function reducer<State, Event, Result = State, Action = never>(
+	props: ReducerProps<State, Event, Result, Action>,
+	onMount?: OnMount,
+) {
 	return new ReducerStore(
-		{
-			init,
-			reduce: setState<Value>,
-			result: id,
-		},
+		props.createStore ?? primitive<State>,
+		props.reducer,
+		'act' in props ? props.act : undefined,
 		onMount,
 	)
 }
 
-export function reducer<Value, Action, Result = Value>(
-	props: ReducerProps<Value, Action, Result>,
-	onMount?: OnMount,
-) {
-	return new ReducerStore(props, onMount)
-}
-
-export class ReducerStore<Value, Action, Result> extends Subscribed<
+class ReducerStore<State, Event, Result, Action> extends Store<
 	Result,
-	[Action],
+	[Event],
 	void
 > {
-	private init
-	private reduce
-	private result
-	private dirty = false
-	protected value: Value = undefined as never
-	private res: Result = undefined as never
-	constructor(props: ReducerProps<Value, Action, Result>, onMount?: OnMount) {
-		super(onMount)
-		this.init = props.init
-		this.reduce = props.reduce
-		this.result = props.result ?? (id as never)
+	store
+	#reduce
+	#result
+	#act
+	constructor(
+		createStore: (init: Init<State>, onMount?: OnMount) => ValueStore<State>,
+		reducer: ReducerValues<State, Event, Result, Action>,
+		act?: (action: Action) => void,
+		onMount?: OnMount,
+	) {
+		super()
+		this.store = createStore(reducer.init, onMount)
+		this.#reduce = reducer.reduce
+		this.#result = reducer.result
+		this.#act = act
 	}
-	private makeDirty() {
-		if (this.dirty) return
-		this.dirty = true
-		this.value = fromInit(this.init)
-		this.res = this.result(this.value)
+	send(event: Event) {
+		const actions: Action[] = []
+		const last = this.store.peek()
+		const next = this.#reduce(event, last, (action: Action) => {
+			actions.push(action)
+		})
+		this.store.send(next)
+		const act = this.#act
+		if (act) actions.forEach(act)
 	}
-	send(arg: Action) {
-		this.makeDirty()
-		const nextValue = this.reduce(arg, this.value)
-		if (Object.is(nextValue, this.value)) return
-		this.value = nextValue
-		const nextRes = this.result(nextValue)
-		if (Object.is(nextRes, this.res)) return
-		this.res = nextRes
-		this.notify()
+	canSend(event: Event) {
+		const last = this.store.peek()
+		let acted = false
+		const next = this.#reduce(event, last, () => {
+			acted = true
+		})
+		return acted || !Object.is(next, last)
 	}
-	peek() {
-		this.makeDirty()
-		return this.res
+	simulate(event: Event) {
+		const last = this.store.peek()
+		const next = this.#reduce(event, last, noop)
+		return this.#result ? this.#result(next) : (next as never)
+	}
+	subscribe(cb: () => void): () => void {
+		return this.store.subscribe(cb)
+	}
+	peek(): Result {
+		return this.#result
+			? this.#result(this.store.peek())
+			: (this.store.peek() as never)
 	}
 }

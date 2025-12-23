@@ -41,13 +41,14 @@ export abstract class Counted<Value, Args extends any[], Result> extends Store<
 	}
 }
 
-export class Observable<Value> {
-	private subscribers = new Set<(value: Value) => void>()
-	onValue(cb: (value: Value) => void) {
-		this.subscribers.add(cb)
-		return () => this.subscribers.delete(cb)
+// TODO: maybe make a mixin
+export class Observable<Args extends any[]> {
+	private observers = new Set<(...args: Args) => void>()
+	observe(cb: (...args: Args) => void) {
+		this.observers.add(cb)
+		return () => this.observers.delete(cb)
 	}
-	emit(value: Value) {
-		this.subscribers.forEach((cb) => cb(value))
+	emit(...args: Args) {
+		this.observers.forEach((cb) => cb(...args))
 	}
 }

@@ -7,7 +7,7 @@
 		"dev": "vite",
 		"build": "tsc -b && vite build",
 		"lint": "eslint .",
-		"check:types": "tsc --noEmit",
+		"check:types": "tsc --noEmit -p tsconfig.app.json",
 		"check:tests": "vitest run --coverage",
 		"dev:tests": "vitest run --watch",
 		"fix:prettier": "prettier --write --cache --cache-strategy metadata .",
@@ -15,6 +15,7 @@
 		"preview": "vite preview"
 	},
 	"dependencies": {
+		"@radix-ui/themes": "^3.2.1",
 		"object-hash": "^3.0.0",
 		"react": "^19.2.0",
 		"react-dom": "^19.2.0",

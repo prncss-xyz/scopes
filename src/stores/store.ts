@@ -1,4 +1,4 @@
-import type { OnMount, Unmount } from '../mount'
+import type { OnMount, Teardown } from '../mount'
 
 export function noWrite(..._: [never]): never {
 	throw new Error('Cannot write to a read-only store')
@@ -13,19 +13,22 @@ interface IStore<Value, Args extends any[], Result> {
 export abstract class Store<Value, Args extends any[], Result>
 	implements IStore<Value, Args, Result>
 {
-	private uOnmount
-	private uUnmount: Unmount = undefined
+	#uOnmount
+	#uUnmount: Teardown = undefined
 	abstract send(...args: Args): Result
 	abstract subscribe(cb: () => void): () => void
 	abstract peek(): Value
+	readonly index
+	#count = 0
 	constructor(onMount?: OnMount) {
-		this.uOnmount = onMount
+		this.#uOnmount = onMount
+		this.index = ++this.#count
 	}
 	protected mount() {
-		this.uUnmount = this.uOnmount?.()
+		this.#uUnmount = this.#uOnmount?.()
 	}
 	protected unmount() {
-		this.uUnmount?.()
+		this.#uUnmount?.()
 	}
 	map<V>(mapper: (value: Value) => V) {
 		return new MappedStore(this, mapper)
@@ -86,37 +89,37 @@ class MappedStore<Value, V, Args extends any[], Result> extends Store<
 	Args,
 	Result
 > {
-	private store
-	private mapper
+	#store
+	#mapper
 	constructor(store: Store<Value, Args, Result>, mapper: (value: Value) => V) {
 		super()
-		this.store = store
-		this.mapper = mapper
+		this.#store = store
+		this.#mapper = mapper
 	}
 	send(...args: Args): Result {
-		return this.store.send(...args)
+		return this.#store.send(...args)
 	}
 	subscribe(cb: () => void): () => void {
-		return this.store.subscribe(cb)
+		return this.#store.subscribe(cb)
 	}
 	peek(): V {
-		return this.mapper(this.store.peek())
+		return this.#mapper(this.#store.peek())
 	}
 }
 
 class ChainedStore<Value, V, A extends any[], R> extends Store<V, A, R> {
-	private store: Store<Value, any, any>
-	private chainer: (value: Value) => Store<V, A, R>
+	#store: Store<Value, any, any>
+	#chainer: (value: Value) => Store<V, A, R>
 	constructor(
 		store: Store<Value, any, any>,
 		chainer: (value: Value) => Store<V, A, R>,
 	) {
 		super()
-		this.store = store
-		this.chainer = chainer
+		this.#store = store
+		this.#chainer = chainer
 	}
 	private getInnerStore(): Store<V, A, R> {
-		return this.chainer(this.store.peek())
+		return this.#chainer(this.#store.peek())
 	}
 	send(...args: A): R {
 		return this.getInnerStore().send(...args)

@@ -1,40 +1,52 @@
-import { useEffect, useState } from 'react'
-import './App.css'
-import { useStore } from './stores/store'
-import { collection } from './collection'
-import { reducer } from './stores/reducer'
+import { Card, Heading } from '@radix-ui/themes'
+import { memoryStorage } from './stores/query/memory'
+import { useStoreValue } from './stores/react'
+import { Suspense, use } from 'react'
 
-const red = collection(
-	reducer,
-	(n: number) => ({
-		init: n,
-		reduce: (a: number, b: number) => a + b,
-		result: (n: number) => n * 2,
-	}),
-	Infinity,
-)
+const storage = memoryStorage({
+	ttl: Infinity,
+	staleTime: Infinity,
+	getDefault: () => 'default',
+	isDefault: (value) => value === 'default',
+	delay: 1000,
+})
 
-function selector(n: number) {
-	return n
+storage.observe((key, next, last) => console.log(key, next, last))
+
+function Json({ children }: { children: unknown }) {
+	return <pre>{JSON.stringify(children, null, 2)}</pre>
 }
 
-function Reducer({ n }: { n: number }) {
-	useEffect(() => red(n).onChange(console.log), [n])
-	const [value, send] = useStore(red(n).map(selector))
-	return <button onClick={() => send(3)}>{value}</button>
+function Suspended({ prop }: { prop: string }) {
+	const pro = useStoreValue(storage.suspend(prop))
+	const value = use(pro)
+	return (
+		<Card>
+			<Heading size='3'>{prop}</Heading>
+			<Json> {value} </Json>
+		</Card>
+	)
+}
+
+function Item({ prop }: { prop: string }) {
+	const value = useStoreValue(storage.get(prop))
+	return (
+		<Card>
+			<Heading size='3'>{prop}</Heading>
+			<Json>{value}</Json>
+		</Card>
+	)
 }
 
 function App() {
-	const [n, setN] = useState(0)
 	return (
-		<>
-			<div style={{ display: 'flex' }}>
-				<button onClick={() => setN(n - 1)}>{'-'}</button>
-				<div>{n}</div>
-				<button onClick={() => setN(n + 1)}>{'+'}</button>
-			</div>
-			<Reducer n={n} />
-		</>
+		<div>
+			<Item prop='hello' />
+			<Suspense>
+				<Suspended prop='hello' />
+			</Suspense>
+			<Item prop='world' />
+		</div>
 	)
 }
 

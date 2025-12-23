@@ -1,11 +1,16 @@
 import type { Prettify } from './types'
 
-type Dep<P> = {
-	[K in keyof P]: (o: never) => P[K]
+type Empty = Record<never, unknown>
+type Schema<O> = {
+	[K in keyof O]: (o: O) => O[K]
 }
-export type Dependancies<P> = <O>(
-	o: keyof P extends keyof O ? never : O,
-) => Prettify<O & Dep<P>>
+type AnySchema<O> = {
+	[K in keyof O]: (o: never) => O[K]
+}
+
+export type Dependancies<Shape> = <O>(
+	o: keyof Shape extends keyof O ? never : O,
+) => Prettify<O & AnySchema<Shape>>
 
 export function dependancy<Key extends PropertyKey, Value>(
 	key: Key,
@@ -14,19 +19,11 @@ export function dependancy<Key extends PropertyKey, Value>(
 	return function <O>(
 		o: Key extends keyof O ? never : O,
 	): Prettify<O & Record<Key, Value>> {
-		;(o as any)[key] = value
-		return o as any
+		return { ...o, [key]: value } as any
 	}
 }
 
-type Empty = Record<never, unknown>
-type Desc<O> = {
-	[P in keyof O]: (o: O) => O[P]
-}
-
-export function inject<T>(
-	fn: (s: Desc<Empty>) => Desc<T>,
-): T {
+export function inject<T>(fn: (s: Schema<Empty>) => Schema<T>): T {
 	const cache: any = {}
 	const proxy = new Proxy(fn({} as any), {
 		get(target: any, prop) {

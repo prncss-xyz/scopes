@@ -1,15 +1,15 @@
-export type OnMount = () => (() => void) | void
-export type Unmount = ReturnType<OnMount>
+export type Teardown = (() => void) | void
+export type OnMount = () => Teardown
 
 export function composeMount(a?: OnMount, b?: OnMount) {
-	if (a === undefined) return b
-	if (b === undefined) return a
+	if (!a) return b
+	if (!b) return a
 	return () => {
-		const cleanupA = a()
-		const cleanupB = b()
+		const teardownA = a()
+		const teardownB = b()
 		return () => {
-			cleanupB?.()
-			cleanupA?.()
+			teardownB?.()
+			teardownA?.()
 		}
 	}
 }
