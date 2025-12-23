@@ -1,36 +1,67 @@
 import { collection } from '../../collection'
-import { queryMachine, type State } from './machine'
-import { reducer } from '../reducer'
-import { exhaustive, type Reset } from '../../functions'
+import { queryMachine, type Action, type State, type Event } from './machine'
+import { reducer, ReducerStore } from '../reducer'
+import { exhaustive, RESET, type Reset } from '../../functions'
 import { composeMount, type OnMount } from '../../mount'
 import { Observable } from '../subscribed'
+import { Suspended, suspended } from './suspended'
 
 const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
 
 // TODO: hydrate
-// TODO: suspend
 // TODO: cancel pending queries
 // TODO: sync equivalent
 // TODO: preserve state in dev
 
-export type QueryProps<Props, Data> = {
-	ttl?: number
-	staleTime?: number
+export interface StorageProps<Props, Data> {
 	get?: (props: Props) => Promise<Data>
 	set?: (props: Props, value: Data) => void
 	observe?: (emit: (props: Props, value: Data) => void) => () => void
-	onMount?: OnMount
 }
 
-export function query<Props, Data>({
+export type QueryProps<Props, Data, Suspend = true> = {
+	ttl?: number
+	staleTime?: number
+  api: StorageProps<Props, Data>
+	onMount?: OnMount
+	suspend?: Suspend
+}
+
+export function query<Props, Data>(
+	props: QueryProps<Props, Data, true>,
+): {
+	get: (key: Props) => Suspended<Data>
+	observe: (
+		cb: (
+			props: Props,
+			next: Data | typeof RESET,
+			last: Data | typeof RESET,
+		) => void,
+	) => () => boolean
+}
+export function query<Props, Data>(
+	props: QueryProps<Props, Data, false>,
+): {
+	get: (
+		key: Props,
+	) => ReducerStore<State<Data>, Event<Data>, State<Data>, Action<Data>>
+	observe: (
+		cb: (
+			props: Props,
+			next: Data | typeof RESET,
+			last: Data | typeof RESET,
+		) => void,
+	) => () => boolean
+}
+export function query<Props, Data, Suspend = true>({
 	ttl,
 	staleTime,
-	get,
-	set,
-	observe,
+  api: { get, set, observe },
 	onMount,
-}: QueryProps<Props, Data>) {
+	suspend,
+}: QueryProps<Props, Data, Suspend>) {
+	suspend ??= true as never
 	const observable = new Observable<
 		[props: Props, next: Data | Reset, last: Data | Reset]
 	>()
@@ -74,7 +105,7 @@ export function query<Props, Data>({
 					return () => r.send({ type: 'unmount' })
 				}),
 			)
-			return r
+			return (suspend ? suspended(r) : r) as any
 		},
 		ttl,
 		composeMount(
@@ -91,22 +122,8 @@ export function query<Props, Data>({
 		),
 	)
 	return {
-		raw,
-		suspend: (props: Props) => {
-			return raw(props).map(suspend)
-		},
+		get: raw,
+		suspend: (props: Props) => suspended(raw(props)),
 		observe: observable.observe.bind(observable),
-	}
-}
-
-function suspend<Data>(state: State<Data>) {
-	switch (state.type) {
-		case 'success':
-		case 'pending':
-			return state.payload.promise
-		case 'error':
-			throw state.payload
-		default:
-			exhaustive(state)
 	}
 }

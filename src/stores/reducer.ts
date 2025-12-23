@@ -30,7 +30,7 @@ export function reducer<State, Event, Result = State, Action = never>(
 	)
 }
 
-class ReducerStore<State, Event, Result, Action> extends Store<
+export class ReducerStore<State, Event, Result, Action> extends Store<
 	Result,
 	[Event],
 	void

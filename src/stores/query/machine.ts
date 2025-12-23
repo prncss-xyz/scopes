@@ -18,7 +18,7 @@ export type State<Data> = (
 			payload: {
 				data: Data
 				since: number
-				promise: Promise<Data>
+				promise: Promise<Data> | undefined
 			}
 	  }
 ) & {
@@ -133,6 +133,12 @@ export function queryMachine<Data>() {
 			last.payload.reject(next.payload)
 		const lastData = last.type === 'success' ? last.payload.data : RESET
 		const nextData = next.type === 'success' ? next.payload.data : RESET
+		if (
+			last.type === 'success' &&
+			next.type === 'success' &&
+			!Object.is(last.payload.data, next.payload.data)
+		)
+			next.payload.promise = undefined
 		if (!Object.is(nextData, lastData)) {
 			act({ type: 'data', payload: { next: nextData, last: lastData } })
 		}

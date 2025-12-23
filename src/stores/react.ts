@@ -1,16 +1,15 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { use, useEffect, useSyncExternalStore } from 'react'
 import type { Store } from './store'
+import { isPromise } from '../functions'
 
-export function useStoreValue<
-	Value,
-	Args extends any[],
-	Result,
-	Select = Value,
->(store: Store<Value, Args, Result>, select?: (value: Value) => Select) {
-	const peek = select
-		? () => select(store.peek())
-		: (store.peek.bind(store) as never)
-	return useSyncExternalStore(store.subscribe.bind(store), peek)
+export function useStoreValue<Value, Args extends any[], Result>(
+	store: Store<Promise<Value> | Value, Args, Result>,
+) {
+	const res = useSyncExternalStore(
+		store.subscribe.bind(store),
+		store.peek.bind(store),
+	)
+	return isPromise(res) ? use(res) : res
 }
 
 export function useStoreOnChange<Value, Args extends any[], Result>(
