@@ -2,7 +2,6 @@ import { collection } from '../../collection'
 import { queryMachine, type Action, type State, type Event } from './machine'
 import { reducer, ReducerStore } from '../reducer'
 import { exhaustive, type Reset } from '../../functions'
-import { composeMount, type OnMount } from '../../mount'
 import { Suspended, suspended } from './suspended'
 import { primitive } from '../primitive'
 import { globalFetch } from './globalFetch'
@@ -12,13 +11,15 @@ const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
 
 // FIXME: reset when already reset
-// TODO: deep merge
-// TODO: sync equivalent
-// TODO: derived: promises
-// TODO: user send function: replace del action, add now to success
+// REFACT: move promise to Suspend
+// FEAT: deep merge
+// FEAT: sync equivalent
+// FEAT: derived: promises
+// FEAT: user send function: replace del action, add now to success
+// FEAT: ssr
 
 function createReducer<Props, Data, Suspend>(
-	query: QueryProps<Props, Data, Suspend>,
+	{ api, staleTime, suspend }: QueryProps<Props, Data, Suspend>,
 	props: Props,
 	observable: Observable<
 		[props: Props, next: Data | Reset, last: Data | Reset]
@@ -49,19 +50,19 @@ function createReducer<Props, Data, Suspend>(
 			act: (action) => {
 				switch (action.type) {
 					case 'abort':
-						if (query.suspend) return
+						if (suspend) return
 						if (!contoller) return
 						contoller.abort()
 						globalFetch.send(-1)
 					case 'fetch':
 						globalFetch.send(1)
 						contoller = new AbortController()
-						query.api
+						api
 							.get?.(props, contoller.signal)
 							.then((data) => {
 								if (contoller.signal.aborted) return
 								globalFetch.send(-1)
-								query.api.set?.(props, data)
+								api.set?.(props, data)
 								r.send({
 									type: 'success',
 									payload: { data, since: Date.now() },
@@ -71,17 +72,17 @@ function createReducer<Props, Data, Suspend>(
 								if (contoller.signal.aborted) return
 								globalFetch.send(-1)
 								r.send({ type: 'error', payload })
-								query.onError?.(payload)
+								api.onError?.(props, payload)
 							})
 						return
 					case 'data':
 						observable.emit(props, action.payload.next, action.payload.last)
 						return
 					case 'delete':
-						if (!query.api.del) return
+						if (!api.del) return
 						r.send({
 							type: 'success',
-							payload: { data: query.api.del(props), since: Date.now() },
+							payload: { data: api.del(props), since: Date.now() },
 						})
 						return
 					default:
@@ -89,21 +90,22 @@ function createReducer<Props, Data, Suspend>(
 				}
 			},
 		},
-		composeMount(query.onMount, () => {
+		() => {
 			r.send({
 				type: 'mount',
-				payload: Date.now() - (query.staleTime ?? defaultStaleTime),
+				payload: Date.now() - (staleTime ?? defaultStaleTime),
 			})
 			return () => r.send({ type: 'unmount' })
-		}),
+		},
 	)
-	return (query.suspend ? suspended(r) : r) as any
+	return (suspend ? suspended(r) : r) as any
 }
 
 export interface StorageProps<Props, Data> {
 	get?: (props: Props, signal: AbortSignal) => Promise<Data>
 	set?: (props: Props, value: Data) => void
 	del?: (props: Props) => Data
+	onError?: (props: Props, error: unknown) => void
 	observe?: (emit: (props: Props, value: Data) => void) => () => void
 }
 
@@ -111,8 +113,6 @@ export type QueryProps<Props, Data, Suspend = true> = {
 	ttl?: number
 	staleTime?: number
 	api: StorageProps<Props, Data>
-	onMount?: OnMount
-	onError?: (error: unknown) => void
 	suspend?: Suspend
 }
 
@@ -144,7 +144,7 @@ export function query<Props, Data, Suspend = true>(
 	const observable = new Observable<
 		[props: Props, next: Data | Reset, last: Data | Reset]
 	>()
-	const raw = collection(
+	const get = collection(
 		(props: Props) => createReducer(queryProps, props, observable),
 		{
 			ttl: queryProps.ttl ?? defaultTTL,
@@ -155,22 +155,19 @@ export function query<Props, Data, Suspend = true>(
 							createReducer(queryProps, props, observable, payload),
 					}
 				: undefined,
-			onMount: composeMount(
-				queryProps.onMount,
-				queryProps.api.observe
-					? () =>
-							queryProps.api.observe!((p, data) =>
-								raw(p).send({
-									type: 'success',
-									payload: { data, since: Date.now() },
-								}),
-							)
-					: undefined,
-			),
+			onMount: queryProps.api.observe
+				? () =>
+						queryProps.api.observe!((p, data) =>
+							get(p).send({
+								type: 'success',
+								payload: { data, since: Date.now() },
+							}),
+						)
+				: undefined,
 		},
 	)
 	return {
-		get: raw,
+		get,
 		observe: observable.observe.bind(observable),
 	}
 }

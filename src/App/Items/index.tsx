@@ -11,9 +11,7 @@ function Fetching() {
 }
 
 function Item({ prop }: { prop: string }) {
-	const [raw, send] = useStore(storage.get(prop))
-	// const value = raw.type === 'success' ? raw.payload.data : 'loading'
-	const value = raw
+	const [value, send] = useStore(storage.get(prop))
 	return (
 		<Card>
 			<Heading size='2'>{prop}</Heading>
@@ -48,7 +46,11 @@ export function Items() {
 			<Fetching />
 			<Suspense>
 				<Item prop='hello' />
+			</Suspense>
+			<Suspense>
 				<Item prop='hello' />
+			</Suspense>
+			<Suspense>
 				<Item prop='world' />
 			</Suspense>
 		</>

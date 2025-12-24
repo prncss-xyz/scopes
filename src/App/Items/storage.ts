@@ -1,6 +1,8 @@
 import { memoryStorage } from '../../stores/query/memory'
 import { query } from '../../stores/query'
 
+export const suspend = true
+
 export const storage = query(
 	{
 		ttl: Infinity,
