@@ -1,4 +1,3 @@
-import { noop } from '../../functions'
 import { reducer } from '../reducer'
 
 export const globalFetchingStore = reducer({
@@ -9,5 +8,4 @@ export const globalFetchingStore = reducer({
 		},
 		result: (state: number) => state > 0,
 	},
-	act: noop,
 })

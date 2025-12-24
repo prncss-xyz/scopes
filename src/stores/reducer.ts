@@ -13,12 +13,21 @@ interface ReducerValues<State, Event, Result, Action> {
 	result?: (value: State) => Result
 }
 
-export type ReducerProps<State, Event, Result, Action> = {
+type ReducerProps<State, Event, Result, Action> = {
 	reducer: ReducerValues<State, Event, Result, Action>
 	createStore?: (init: Init<State>, onMount?: OnMount) => ValueStore<State>
-} & (never extends Action ? { act: (action: Action) => void } : {}) // FIXME:
+	act?: (action: Action) => void
+}
 
-export function reducer<State, Event, Result = State, Action = never>(
+export function reducer<State, Event, Action extends never, Result = State>(
+	props: ReducerProps<State, Event, Result, Action>,
+	onMount?: OnMount,
+): ReducerStore<State, Event, Result, Action>
+export function reducer<State, Event, Action extends unknown, Result = State>(
+	props: ReducerProps<State, Event, Result, Action> & { act: any },
+	onMount?: OnMount,
+): ReducerStore<State, Event, Result, Action>
+export function reducer<State, Event, Action, Result>(
 	props: ReducerProps<State, Event, Result, Action>,
 	onMount?: OnMount,
 ) {
