@@ -10,7 +10,6 @@ import { suspended } from './suspended'
 const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
 
-// FIXME: reset when already reset
 // FEAT: better abort logic
 // FEAT: improve API, user send function: replace del action, add now to success
 // FEAT: sync equivalent
@@ -148,6 +147,5 @@ export function query<Props, Data>(
 		get: (props: Props) => c.get(props),
 		suspend: (props: Props) => suspended(c.get(props)),
 		observe: observable.observe.bind(observable),
-		// TODO: clear
 	}
 }

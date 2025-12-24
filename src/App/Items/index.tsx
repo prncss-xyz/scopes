@@ -11,7 +11,7 @@ function GlobalFetching() {
 }
 
 function Item({ prop }: { prop: string }) {
-	const [value, send] = useStore(storage.get(prop))
+	const [value, send] = useStore(storage.suspend(prop))
 	return (
 		<Card>
 			<Heading size='2'>{prop}</Heading>

@@ -100,9 +100,8 @@ export function queryMachine<Data>() {
 				}
 			case 'success':
 				const promise =
-					state.type === 'pending'
-						? state.payload.promise
-						: Promise.resolve(event.payload.data)
+					state.type === 'pending' ? state.payload.promise : undefined
+
 				return {
 					type: 'success',
 					payload: { ...event.payload, promise },
