@@ -6,7 +6,7 @@ export type State =
 
 export type Event<Props> =
 	| {
-			type: 'cancel' | 'success'
+			type: 'abort' | 'success'
 	  }
 	| { type: 'error'; payload: unknown }
 	| { type: 'mutate'; payload: Props }
@@ -16,7 +16,7 @@ export type Action<Props> =
 			type: 'mutate'
 			payload: Props
 	  }
-	| { type: 'cancel' }
+	| { type: 'abort' }
 
 export function mutationMachine<Props>() {
 	function init(): State {
@@ -38,9 +38,9 @@ export function mutationMachine<Props>() {
 				return { type: 'error', payload: event.payload }
 			case 'success':
 				return { type: 'success' }
-			case 'cancel':
+			case 'abort':
 				if (state.type !== 'pending') return state
-				act({ type: 'cancel' })
+				act({ type: 'abort' })
 				return { ...state, type: 'idle' }
 			default:
 				return exhaustive(event)

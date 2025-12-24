@@ -28,13 +28,7 @@ export type State<Data> = (
 
 export type Event<Data> =
 	| {
-			type:
-				| 'reset'
-				| 'invalidate'
-				| 'prefetch'
-				| 'cancel'
-				| 'unmount'
-				| 'delete'
+			type: 'reset' | 'invalidate' | 'prefetch' | 'abort' | 'unmount' | 'delete'
 	  }
 	| { type: 'update'; payload: Modify<Data> }
 	| {
@@ -61,7 +55,7 @@ export type Action<Data> =
 				last: Data | Reset
 			}
 	  }
-	| { type: 'fetch' | 'cancel' | 'delete' }
+	| { type: 'fetch' | 'abort' | 'delete' }
 
 export function queryMachine<Data>() {
 	function init(): State<Data> {
@@ -78,7 +72,8 @@ export function queryMachine<Data>() {
 		act: (action: Action<Data>) => void,
 	): State<Data> {
 		switch (event.type) {
-			case 'cancel':
+			case 'abort':
+				if (state.mounted) return state
 				return { ...state, fetching: false }
 			case 'update':
 				if (state.type === 'success') {
@@ -125,6 +120,7 @@ export function queryMachine<Data>() {
 					mounted: true,
 				}
 			case 'unmount':
+        if (state.fetching) act({ type: 'abort' })
 				return { ...state, mounted: false }
 			case 'delete':
 				act({ type: 'delete' })

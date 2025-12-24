@@ -10,13 +10,12 @@ const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
 
 // TODO: hydrate
-// TODO: cancel pending queries
 // TODO: sync equivalent
 // TODO: derived: promises
 // TODO: user send function: replace del action, add now to success
 
 export interface StorageProps<Props, Data> {
-	get?: (props: Props) => Promise<Data>
+	get?: (props: Props, signal: AbortSignal) => Promise<Data>
 	set?: (props: Props, value: Data) => void
 	del?: (props: Props) => Data
 	observe?: (emit: (props: Props, value: Data) => void) => () => void
@@ -63,16 +62,20 @@ export function query<Props, Data, Suspend = true>({
 	staleTime ??= defaultStaleTime
 	const raw = collection(
 		(props: Props, onMount) => {
+			let contoller: AbortController
 			const r = reducer(
 				{
 					reducer: queryMachine<Data>(),
 					act: (action) => {
 						switch (action.type) {
-							case 'cancel':
-								throw new Error('Method not implemented.')
+							case 'abort':
+                if (suspend) return
+								contoller?.abort()
 							case 'fetch':
-								get?.(props)
+								contoller = new AbortController()
+								get?.(props, contoller.signal)
 									.then((data) => {
+										if (contoller.signal.aborted) return
 										set?.(props, data)
 										r.send({
 											type: 'success',
@@ -80,6 +83,7 @@ export function query<Props, Data, Suspend = true>({
 										})
 									})
 									.catch((payload) => {
+										if (contoller.signal.aborted) return
 										return r.send({ type: 'error', payload })
 									})
 								return

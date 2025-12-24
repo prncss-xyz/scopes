@@ -29,9 +29,9 @@ export function Mutation() {
 			</Button>
 			<Button
 				disabled={state.type !== 'pending'}
-				onClick={() => send({ type: 'cancel' })}
+				onClick={() => send({ type: 'abort' })}
 			>
-				Cancel
+				Abort
 			</Button>
 			<Json>{state}</Json>
 		</Card>
