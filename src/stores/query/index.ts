@@ -26,6 +26,7 @@ export type QueryProps<Props, Data, Suspend = true> = {
 	staleTime?: number
 	api: StorageProps<Props, Data>
 	onMount?: OnMount
+	onError?: (error: unknown) => void
 	suspend?: Suspend
 }
 
@@ -52,6 +53,7 @@ export function query<Props, Data, Suspend = true>({
 	staleTime,
 	api: { get, set, del, observe },
 	onMount,
+	onError,
 	suspend,
 }: QueryProps<Props, Data, Suspend>) {
 	suspend ??= true as never
@@ -69,7 +71,7 @@ export function query<Props, Data, Suspend = true>({
 					act: (action) => {
 						switch (action.type) {
 							case 'abort':
-                if (suspend) return
+								if (suspend) return
 								contoller?.abort()
 							case 'fetch':
 								contoller = new AbortController()
@@ -84,7 +86,8 @@ export function query<Props, Data, Suspend = true>({
 									})
 									.catch((payload) => {
 										if (contoller.signal.aborted) return
-										return r.send({ type: 'error', payload })
+										r.send({ type: 'error', payload })
+										onError?.(payload)
 									})
 								return
 							case 'data':
