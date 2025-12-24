@@ -1,5 +1,7 @@
 import type { OnMount, Teardown } from '../mount'
 
+// FEAT: ssr
+
 export function noWrite(..._: [never]): never {
 	throw new Error('Cannot write to a read-only store')
 }

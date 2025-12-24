@@ -3,6 +3,8 @@ import type { OnMount, Teardown } from '../mount'
 import { Store } from './store'
 import { Counted, Subscribed } from './subscribed'
 
+// FEAT: make derived stores work with suspend
+
 function noRead(): never {
 	throw new Error('Cannot read from a write-only store')
 }

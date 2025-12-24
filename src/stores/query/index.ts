@@ -10,12 +10,10 @@ import { suspended } from './suspended'
 const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
 
-// FEAT: better abort logic
+// FEAT: global actions
 // FEAT: improve API, user send function: replace del action, add now to success
 // FEAT: sync equivalent
 // FEAT: deep merge
-// FEAT: derived: promises
-// FEAT: ssr
 // REFACT: move promise to Suspend
 
 export interface StorageProps<Props, Data> {

@@ -99,12 +99,13 @@ export function queryMachine<Data>() {
 					payload: Promise.withResolvers<Data>(),
 				}
 			case 'success':
-				const promise =
-					state.type === 'pending' ? state.payload.promise : undefined
-
 				return {
 					type: 'success',
-					payload: { ...event.payload, promise },
+					payload: {
+						...event.payload,
+						promise:
+							state.type === 'pending' ? state.payload.promise : undefined,
+					},
 					mounted: state.mounted,
 					fetching: false,
 				}
@@ -119,9 +120,10 @@ export function queryMachine<Data>() {
 					mounted: true,
 				}
 			case 'unmount':
-				if (state.fetching) act({ type: 'abort' })
-				return { ...state, mounted: false }
+        // TODO: Do we want to stop fetching on unmount?
+				return { ...state, mounted: false, fetching: false }
 			case 'delete':
+        // TODO: make it happen before reducer
 				act({ type: 'delete' })
 				return state
 			default:
@@ -135,18 +137,13 @@ export function queryMachine<Data>() {
 	) {
 		const next = reduce0(event, last, act)
 		if (next.fetching && !last.fetching) act({ type: 'fetch' })
-		if (next.type === 'success' && last.type === 'pending')
-			last.payload.resolve(next.payload.data)
-		if (next.type === 'error' && last.type === 'pending')
-			last.payload.reject(next.payload)
+		if (!next.fetching && last.fetching) act({ type: 'abort' })
+		if (last.type === 'pending') {
+			if (next.type === 'success') last.payload.resolve(next.payload.data)
+			if (next.type === 'error') last.payload.reject(next.payload)
+		}
 		const lastData = last.type === 'success' ? last.payload.data : RESET
 		const nextData = next.type === 'success' ? next.payload.data : RESET
-		if (
-			last.type === 'success' &&
-			next.type === 'success' &&
-			!Object.is(last.payload.data, next.payload.data)
-		)
-			next.payload.promise = undefined
 		if (!Object.is(nextData, lastData)) {
 			act({ type: 'data', payload: { next: nextData, last: lastData } })
 		}
