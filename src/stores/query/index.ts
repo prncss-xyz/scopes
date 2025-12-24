@@ -1,11 +1,12 @@
 import { collection } from '../../collection'
 import { queryMachine, type State, type Event } from './machine'
 import { reducer } from '../reducer'
-import { exhaustive, type Reset } from '../../functions'
-import { primitive } from '../primitive'
+import { exhaustive, type Init, type Reset } from '../../functions'
 import { globalFetchingStore } from './globalFetching'
 import { Observable } from '../observable'
 import { suspended } from './suspended'
+import { primitiveWithOnPeek } from './primitiveWithOnPeek'
+import type { OnMount } from '../../mount'
 
 const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
@@ -29,6 +30,19 @@ export type QueryProps<Props, Data> = {
 	api: StorageProps<Props, Data>
 }
 
+function primitive<Data>(
+	action: () => void,
+	init: Init<State<Data>>,
+	onMount?: OnMount,
+) {
+	return primitiveWithOnPeek(
+		init,
+		(state) => state.type === 'pending' && !state.fetching,
+		action,
+		onMount,
+	)
+}
+
 function createReducer<Props, Data>(
 	{ api, staleTime }: QueryProps<Props, Data>,
 	props: Props,
@@ -41,22 +55,22 @@ function createReducer<Props, Data>(
 	},
 ) {
 	let contoller: AbortController
-	return reducer(
+	const get = reducer(
 		{
 			reducer: queryMachine<Data>(),
 			createStore: (init, onMount) => {
-				if (payload) {
-					return primitive<State<Data>>(
-						{
-							type: 'success',
-							payload,
-							fetching: false,
-							mounted: false,
-						},
-						onMount,
-					)
-				}
-				return primitive(init, onMount)
+				return primitive(
+					() => get.send({ type: 'prefetch' }),
+					payload
+						? {
+								type: 'success',
+								payload,
+								fetching: false,
+								mounted: false,
+							}
+						: init,
+					onMount,
+				)
 			},
 			act: (action, send) => {
 				switch (action.type) {
@@ -108,6 +122,7 @@ function createReducer<Props, Data>(
 			return () => send({ type: '_unmount' })
 		},
 	)
+	return get
 }
 
 const sendQueriesCallbacks: ((

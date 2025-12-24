@@ -24,10 +24,9 @@ export class Suspended<Data> extends Store<
 			case 'error':
 				throw raw.payload
 			case 'pending':
-				this.#store.send({ type: 'prefetch' })
 				return raw.payload.promise
 			case 'success':
-				return raw.payload.promise ?? raw.payload.data
+				return raw.payload.data
 			default:
 				return exhaustive(raw)
 		}
