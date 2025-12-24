@@ -1,26 +1,40 @@
 import { collection } from '../../collection'
-import { queryMachine, type Action, type State, type Event } from './machine'
-import { reducer, ReducerStore } from '../reducer'
+import { queryMachine, type State } from './machine'
+import { reducer } from '../reducer'
 import { exhaustive, type Reset } from '../../functions'
-import { Suspended, suspended } from './suspended'
 import { primitive } from '../primitive'
 import { globalFetchingStore } from './globalFetching'
 import { Observable } from '../observable'
+import { suspended } from './suspended'
 
 const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
 
 // FIXME: reset when already reset
-// REFACT: move promise to Suspend
 // FEAT: better abort logic
-// FEAT: deep merge
+// FEAT: improve API, user send function: replace del action, add now to success
 // FEAT: sync equivalent
+// FEAT: deep merge
 // FEAT: derived: promises
-// FEAT: user send function: replace del action, add now to success
 // FEAT: ssr
+// REFACT: move promise to Suspend
 
-function createReducer<Props, Data, Suspend>(
-	{ api, staleTime, suspend }: QueryProps<Props, Data, Suspend>,
+export interface StorageProps<Props, Data> {
+	get?: (props: Props, signal: AbortSignal) => Promise<Data>
+	set?: (props: Props, value: Data) => void
+	del?: (props: Props) => Data
+	onError?: (props: Props, error: unknown) => void
+	observe?: (emit: (props: Props, value: Data) => void) => () => void
+}
+
+export type QueryProps<Props, Data> = {
+	ttl?: number
+	staleTime?: number
+	api: StorageProps<Props, Data>
+}
+
+function createReducer<Props, Data>(
+	{ api, staleTime }: QueryProps<Props, Data>,
 	props: Props,
 	observable: Observable<
 		[props: Props, next: Data | Reset, last: Data | Reset]
@@ -51,7 +65,6 @@ function createReducer<Props, Data, Suspend>(
 			act: (action) => {
 				switch (action.type) {
 					case 'abort':
-						if (suspend) return
 						if (!contoller) return
 						contoller.abort()
 						globalFetchingStore.send(-1)
@@ -99,53 +112,17 @@ function createReducer<Props, Data, Suspend>(
 			return () => r.send({ type: 'unmount' })
 		},
 	)
-	return (suspend ? suspended(r) : r) as any
-}
-
-export interface StorageProps<Props, Data> {
-	get?: (props: Props, signal: AbortSignal) => Promise<Data>
-	set?: (props: Props, value: Data) => void
-	del?: (props: Props) => Data
-	onError?: (props: Props, error: unknown) => void
-	observe?: (emit: (props: Props, value: Data) => void) => () => void
-}
-
-export type QueryProps<Props, Data, Suspend = true> = {
-	ttl?: number
-	staleTime?: number
-	api: StorageProps<Props, Data>
-	suspend?: Suspend
+	return r
 }
 
 export function query<Props, Data>(
-	props: QueryProps<Props, Data, true>,
-	hydrate?: Iterable<[Props, { data: Data; since: number }]>,
-): {
-	get: (key: Props) => Suspended<Data>
-	observe: (
-		cb: (props: Props, next: Data | Reset, last: Data | Reset) => void,
-	) => () => boolean
-}
-export function query<Props, Data>(
-	props: QueryProps<Props, Data, false>,
-	hydrate?: Iterable<[Props, { data: Data; since: number }]>,
-): {
-	get: (
-		key: Props,
-	) => ReducerStore<State<Data>, Event<Data>, State<Data>, Action<Data>>
-	observe: (
-		cb: (props: Props, next: Data | Reset, last: Data | Reset) => void,
-	) => () => boolean
-}
-export function query<Props, Data, Suspend = true>(
-	queryProps: QueryProps<Props, Data, Suspend>,
+	queryProps: QueryProps<Props, Data>,
 	hydrate?: Iterable<[Props, { data: Data; since: number }]>,
 ) {
-	queryProps.suspend ??= true as never
 	const observable = new Observable<
 		[props: Props, next: Data | Reset, last: Data | Reset]
 	>()
-	const get = collection(
+	const c = collection(
 		(props: Props) => createReducer(queryProps, props, observable),
 		{
 			ttl: queryProps.ttl ?? defaultTTL,
@@ -159,7 +136,7 @@ export function query<Props, Data, Suspend = true>(
 			onMount: queryProps.api.observe
 				? () =>
 						queryProps.api.observe!((p, data) =>
-							get(p).send({
+							c.get(p).send({
 								type: 'success',
 								payload: { data, since: Date.now() },
 							}),
@@ -168,7 +145,9 @@ export function query<Props, Data, Suspend = true>(
 		},
 	)
 	return {
-		get,
+		get: (props: Props) => c.get(props),
+		suspend: (props: Props) => suspended(c.get(props)),
 		observe: observable.observe.bind(observable),
+		// TODO: clear
 	}
 }

@@ -1,6 +1,6 @@
-import type { Prettify } from './types'
+import type { Prettify } from '../types'
 
-type Empty = Record<never, unknown>
+export type Empty = Record<never, unknown>
 type Schema<O> = {
 	[K in keyof O]: (o: O) => O[K]
 }

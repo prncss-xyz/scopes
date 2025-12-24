@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { dependancy, inject, type Dependancies } from './deps'
-import { pipe } from './functions/pipe'
+import { dependancy, inject, type Dependancies } from '.'
+import { pipe } from '../functions/pipe'
 
 type A = Dependancies<{ a: number }>
 

@@ -13,7 +13,7 @@ interface IStore<Value, Args extends any[], Result> {
 export abstract class Store<Value, Args extends any[], Result>
 	implements IStore<Value, Args, Result>
 {
-	#uOnmount
+	#uOnMount
 	#uUnmount: Teardown = undefined
 	abstract send(...args: Args): Result
 	abstract subscribe(cb: () => void): () => void
@@ -21,11 +21,11 @@ export abstract class Store<Value, Args extends any[], Result>
 	readonly index
 	#count = 0
 	constructor(onMount?: OnMount) {
-		this.#uOnmount = onMount
+		this.#uOnMount = onMount
 		this.index = ++this.#count
 	}
 	protected mount() {
-		this.#uUnmount = this.#uOnmount?.()
+		this.#uUnmount = this.#uOnMount?.()
 	}
 	protected unmount() {
 		this.#uUnmount?.()

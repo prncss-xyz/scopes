@@ -1,4 +1,4 @@
-import type { Prettify } from './types'
+import type { Prettify } from '../types'
 
 type Dep<P> = {
 	[K in keyof P]: (o: never) => P[K]

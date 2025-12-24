@@ -1,8 +1,6 @@
 import { memoryStorage } from '../../stores/query/memory'
 import { query } from '../../stores/query'
 
-export const suspend = true
-
 export const storage = query(
 	{
 		ttl: Infinity,
@@ -10,7 +8,6 @@ export const storage = query(
 		api: memoryStorage({
 			getDefault: () => 'default',
 		}),
-		suspend: true,
 	},
 	[['world', { data: 'monde', since: 0 }]],
 )
