@@ -10,10 +10,10 @@ import { suspended } from './suspended'
 const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
 
-// FEAT: improve API, user send function: replace del action, add now to success
 // FEAT: sync equivalent
-// FEAT: deep merge
+// FEAT: prefetch on creation; action to delete single entry
 // REFACT: move promise to Suspend
+// FEAT: deep merge
 
 export interface StorageProps<Props, Data> {
 	get?: (props: Props, signal: AbortSignal) => Promise<Data>
@@ -41,7 +41,7 @@ function createReducer<Props, Data>(
 	},
 ) {
 	let contoller: AbortController
-	const r = reducer(
+	return reducer(
 		{
 			reducer: queryMachine<Data>(),
 			createStore: (init, onMount) => {
@@ -58,7 +58,7 @@ function createReducer<Props, Data>(
 				}
 				return primitive(init, onMount)
 			},
-			act: (action) => {
+			act: (action, send) => {
 				switch (action.type) {
 					case 'abort':
 						if (!contoller) return
@@ -73,7 +73,7 @@ function createReducer<Props, Data>(
 								if (contoller.signal.aborted) return
 								globalFetchingStore.send(-1)
 								api.set?.(props, data)
-								r.send({
+								send({
 									type: 'success',
 									payload: { data, since: Date.now() },
 								})
@@ -81,7 +81,7 @@ function createReducer<Props, Data>(
 							.catch((payload) => {
 								if (contoller.signal.aborted) return
 								globalFetchingStore.send(-1)
-								r.send({ type: 'error', payload })
+								send({ type: 'error', payload })
 								api.onError?.(props, payload)
 							})
 						return
@@ -90,7 +90,7 @@ function createReducer<Props, Data>(
 						return
 					case 'delete':
 						if (!api.del) return
-						r.send({
+						send({
 							type: 'success',
 							payload: { data: api.del(props), since: Date.now() },
 						})
@@ -100,15 +100,14 @@ function createReducer<Props, Data>(
 				}
 			},
 		},
-		() => {
-			r.send({
-				type: 'mount',
+		(send) => {
+			send({
+				type: '_mount',
 				payload: Date.now() - (staleTime ?? defaultStaleTime),
 			})
-			return () => r.send({ type: 'unmount' })
+			return () => send({ type: '_unmount' })
 		},
 	)
-	return r
 }
 
 const sendQueriesCallbacks: ((

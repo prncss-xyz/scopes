@@ -1,7 +1,9 @@
 import { noop, type Init } from '../functions'
-import { type OnMount } from '../mount'
+import { type OnMount, type Teardown } from '../mount'
 import { primitive, type ValueStore } from './primitive'
 import { Store } from './store'
+
+type LocalOnMount<Event> = (send: (event: Event) => void) => Teardown
 
 export type Reducer<Props, State, Event, Result, Action> = (
 	props: Props,
@@ -16,20 +18,20 @@ interface ReducerValues<State, Event, Result, Action> {
 type ReducerProps<State, Event, Result, Action> = {
 	reducer: ReducerValues<State, Event, Result, Action>
 	createStore?: (init: Init<State>, onMount?: OnMount) => ValueStore<State>
-	act?: (action: Action) => void
+	act?: (action: Action, send: (event: Event) => void) => void
 }
 
 export function reducer<State, Event, Action extends never, Result = State>(
 	props: ReducerProps<State, Event, Result, Action>,
-	onMount?: OnMount,
+	onMount?: LocalOnMount<Event>,
 ): ReducerStore<State, Event, Result, Action>
 export function reducer<State, Event, Action extends unknown, Result = State>(
 	props: ReducerProps<State, Event, Result, Action> & { act: any },
-	onMount?: OnMount,
+	onMount?: LocalOnMount<Event>,
 ): ReducerStore<State, Event, Result, Action>
 export function reducer<State, Event, Action, Result>(
 	props: ReducerProps<State, Event, Result, Action>,
-	onMount?: OnMount,
+	onMount?: LocalOnMount<Event>,
 ) {
 	return new ReducerStore(
 		props.createStore ?? primitive<State>,
@@ -39,11 +41,12 @@ export function reducer<State, Event, Action, Result>(
 	)
 }
 
-export class ReducerStore<State, Event, Result, Action> extends Store<
+export class ReducerStore<
+	State,
+	Event,
 	Result,
-	[Event],
-	void
-> {
+	Action,
+> extends Store<Result, [Event], void> {
 	store
 	#reduce
 	#result
@@ -51,11 +54,14 @@ export class ReducerStore<State, Event, Result, Action> extends Store<
 	constructor(
 		createStore: (init: Init<State>, onMount?: OnMount) => ValueStore<State>,
 		reducer: ReducerValues<State, Event, Result, Action>,
-		act?: (action: Action) => void,
-		onMount?: OnMount,
+		act?: (action: Action, send: (event: Event) => void) => void,
+		onMount?: LocalOnMount<Event>,
 	) {
 		super()
-		this.store = createStore(reducer.init, onMount)
+		this.store = createStore(
+			reducer.init,
+			onMount ? () => onMount(this.send.bind(this)) : undefined,
+		)
 		this.#reduce = reducer.reduce
 		this.#result = reducer.result
 		this.#act = act
@@ -68,7 +74,7 @@ export class ReducerStore<State, Event, Result, Action> extends Store<
 		})
 		this.store.send(next)
 		const act = this.#act
-		if (act) actions.forEach(act)
+		if (act) actions.forEach((action) => act(action, this.send.bind(this)))
 	}
 	canSend(event: Event) {
 		const last = this.store.peek()

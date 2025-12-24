@@ -17,10 +17,10 @@ export function mutation<Data, Props = void>({
 	onMount,
 }: MutationProps<Props, Data>) {
 	let controller: AbortController
-	const r = reducer(
+	return reducer(
 		{
 			reducer: mutationMachine<Props>(),
-			act: (action) => {
+			act: (action, send) => {
 				switch (action.type) {
 					case 'abort':
 						controller?.abort()
@@ -31,12 +31,12 @@ export function mutation<Data, Props = void>({
 							.then((data) => {
 								if (controller.signal.aborted) return
 								onSuccess?.(data)
-								r.send({ type: 'success' })
+								send({ type: 'success' })
 							})
 							.catch((e) => {
 								if (controller.signal.aborted) return
 								onError?.(e)
-								return r.send({ type: 'error', payload: e })
+								return send({ type: 'error', payload: e })
 							})
 						return
 					default:
@@ -46,5 +46,4 @@ export function mutation<Data, Props = void>({
 		},
 		onMount,
 	)
-	return r
 }

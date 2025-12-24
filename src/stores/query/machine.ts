@@ -28,11 +28,11 @@ export type State<Data> = (
 
 export type Event<Data> =
 	| {
-			type: 'reset' | 'invalidate' | 'prefetch' | 'abort' | 'unmount' | 'delete'
+			type: 'reset' | 'invalidate' | 'prefetch' | 'abort' | '_unmount' | 'delete'
 	  }
 	| { type: 'update'; payload: Modify<Data> }
 	| {
-			type: 'mount'
+			type: '_mount'
 			payload: number
 	  }
 	| {
@@ -111,7 +111,7 @@ export function queryMachine<Data>() {
 				}
 			case 'error':
 				return { ...event, mounted: state.mounted, fetching: false }
-			case 'mount':
+			case '_mount':
 				return {
 					...state,
 					fetching: !(
@@ -119,7 +119,7 @@ export function queryMachine<Data>() {
 					),
 					mounted: true,
 				}
-			case 'unmount':
+			case '_unmount':
         // TODO: Do we want to stop fetching on unmount?
 				return { ...state, mounted: false, fetching: false }
 			case 'delete':
