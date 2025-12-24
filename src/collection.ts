@@ -26,7 +26,7 @@ export function collection<Key, Payload, Encoded>(
 		onMount?: OnMount
 		hydrate?: {
 			values: Iterable<[Key, Encoded]>
-			decode: (value: Encoded) => Payload
+			decode: (value: Encoded, key: Key) => Payload
 		}
 	},
 ): (key: Key) => Payload {
@@ -37,7 +37,7 @@ export function collection<Key, Payload, Encoded>(
 	let teardown: Teardown = undefined
 	if (opts?.hydrate) {
 		for (const [key, value] of opts.hydrate.values)
-			store.set(getHash(key), [0, opts.hydrate.decode(value)])
+			store.set(getHash(key), [0, opts.hydrate.decode(value, key)])
 	}
 	return (key: Key) => {
 		const hash = getHash(key)

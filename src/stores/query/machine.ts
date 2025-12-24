@@ -18,7 +18,7 @@ export type State<Data> = (
 			payload: {
 				data: Data
 				since: number
-				promise: Promise<Data> | undefined
+				promise?: Promise<Data>
 			}
 	  }
 ) & {
@@ -120,7 +120,7 @@ export function queryMachine<Data>() {
 					mounted: true,
 				}
 			case 'unmount':
-        if (state.fetching) act({ type: 'abort' })
+				if (state.fetching) act({ type: 'abort' })
 				return { ...state, mounted: false }
 			case 'delete':
 				act({ type: 'delete' })
