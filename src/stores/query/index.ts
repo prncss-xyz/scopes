@@ -1,5 +1,5 @@
 import { collection } from '../../collection'
-import { queryMachine, type State } from './machine'
+import { queryMachine, type State, type Event } from './machine'
 import { reducer } from '../reducer'
 import { exhaustive, type Reset } from '../../functions'
 import { primitive } from '../primitive'
@@ -10,7 +10,6 @@ import { suspended } from './suspended'
 const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
 
-// FEAT: global actions
 // FEAT: improve API, user send function: replace del action, add now to success
 // FEAT: sync equivalent
 // FEAT: deep merge
@@ -112,6 +111,18 @@ function createReducer<Props, Data>(
 	return r
 }
 
+const sendQueriesCallbacks: ((
+	filter: (props: unknown) => boolean,
+	event: Event<never>,
+) => void)[] = []
+
+export function sendQueries(
+	filter: (props: unknown) => boolean,
+	event: Event<never>, // TODO: actually remove update and success events
+) {
+	sendQueriesCallbacks.forEach((callback) => callback(filter, event))
+}
+
 export function query<Props, Data>(
 	queryProps: QueryProps<Props, Data>,
 	hydrate?: Iterable<[Props, { data: Data; since: number }]>,
@@ -141,9 +152,14 @@ export function query<Props, Data>(
 				: undefined,
 		},
 	)
+	function send(filter: (props: Props) => boolean, event: Event<Data>) {
+		c.forEach((key, store) => filter(key) && store.send(event))
+	}
+	sendQueriesCallbacks.push(send as any)
 	return {
 		get: (props: Props) => c.get(props),
 		suspend: (props: Props) => suspended(c.get(props)),
 		observe: observable.observe.bind(observable),
+		send,
 	}
 }

@@ -20,9 +20,9 @@ export function familly<Key, Props, Payload, Encoded>(
 	return collection((key: Key) => template(factory(key)), opts)
 }
 
-const allClearEntries: ((filter: (u: unknown) => boolean) => void)[] = []
+const clearCollectionEntriesCallbacks: ((filter: (u: unknown) => boolean) => void)[] = []
 export function clearCollectionEntries(filter: (u: unknown) => boolean) {
-	allClearEntries.forEach((clear) => clear(filter))
+	clearCollectionEntriesCallbacks.forEach((clear) => clear(filter))
 }
 
 export function collection<Key, Payload, Encoded>(
@@ -45,7 +45,7 @@ export function collection<Key, Payload, Encoded>(
 		for (const [key, value] of opts.hydrate.values)
 			store.set(getHash(key), [0, opts.hydrate.decode(value, key), key])
 	}
-	allClearEntries.push((filter) => {
+	clearCollectionEntriesCallbacks.push((filter) => {
 		store.forEach((entry) => {
 			if (filter(entry[KEY])) store.delete(getHash(entry[KEY]))
 		})
