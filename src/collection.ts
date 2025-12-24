@@ -4,23 +4,41 @@ import { getHash } from './tanstack-utils'
 const handle = 0
 const payload = 1
 
-export function familly<Key, Props, Payload>(
+export function familly<Key, Props, Payload, Encoded>(
 	template: (props: Props, onMount?: OnMount) => Payload,
 	factory: (key: Key) => Props,
-	ttl = 0,
+	opts?: {
+		ttl?: number
+		onMount?: OnMount
+		hydrate?: {
+			values: Iterable<[Key, Encoded]>
+			decode: (value: Encoded) => Payload
+		}
+	},
 ) {
-	return collection((key: Key) => template(factory(key)), ttl)
+	return collection((key: Key) => template(factory(key)), opts)
 }
 
-export function collection<Key, Payload>(
+export function collection<Key, Payload, Encoded>(
 	factory: (key: Key, onMount?: OnMount) => Payload,
-	ttl: number,
-	onMount?: OnMount,
+	opts?: {
+		ttl?: number
+		onMount?: OnMount
+		hydrate?: {
+			values: Iterable<[Key, Encoded]>
+			decode: (value: Encoded) => Payload
+		}
+	},
 ): (key: Key) => Payload {
+	const ttl = opts?.ttl ?? 0
 	type Entry = [number, Payload]
 	const store = new Map<string, Entry>()
 	let count = 0
 	let teardown: Teardown = undefined
+	if (opts?.hydrate) {
+		for (const [key, value] of opts.hydrate.values)
+			store.set(getHash(key), [0, opts.hydrate.decode(value)])
+	}
 	return (key: Key) => {
 		const hash = getHash(key)
 		const cached = store.get(hash)
@@ -34,7 +52,7 @@ export function collection<Key, Payload>(
 		const created = [
 			0,
 			factory(key, () => {
-				if (count === 0) teardown = onMount?.()
+				if (count === 0) teardown = opts?.onMount?.()
 				++count
 				return () => {
 					--count

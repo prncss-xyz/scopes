@@ -9,6 +9,8 @@ import { Suspended, suspended } from './suspended'
 const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
 
+// TODO: global fetching indicator
+// TODO: deep merge
 // TODO: hydrate
 // TODO: sync equivalent
 // TODO: derived: promises
@@ -63,7 +65,7 @@ export function query<Props, Data, Suspend = true>({
 	ttl ??= defaultTTL
 	staleTime ??= defaultStaleTime
 	const raw = collection(
-		(props: Props, onMount) => {
+		(props: Props) => {
 			let contoller: AbortController
 			const r = reducer(
 				{
@@ -115,19 +117,21 @@ export function query<Props, Data, Suspend = true>({
 			)
 			return (suspend ? suspended(r) : r) as any
 		},
-		ttl,
-		composeMount(
-			onMount,
-			observe
-				? () =>
-						observe((p, data) =>
-							raw(p).send({
-								type: 'success',
-								payload: { data, since: Date.now() },
-							}),
-						)
-				: undefined,
-		),
+		{
+			ttl,
+			onMount: composeMount(
+				onMount,
+				observe
+					? () =>
+							observe((p, data) =>
+								raw(p).send({
+									type: 'success',
+									payload: { data, since: Date.now() },
+								}),
+							)
+					: undefined,
+			),
+		},
 	)
 	return {
 		get: raw,
