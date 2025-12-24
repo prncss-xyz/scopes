@@ -3,14 +3,15 @@ import { queryMachine, type Action, type State, type Event } from './machine'
 import { reducer, ReducerStore } from '../reducer'
 import { exhaustive, type Reset } from '../../functions'
 import { composeMount, type OnMount } from '../../mount'
-import { Observable } from '../subscribed'
 import { Suspended, suspended } from './suspended'
 import { primitive } from '../primitive'
+import { globalFetch } from './globalFetch'
+import { Observable } from '../observable'
 
 const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
 
-// TODO: global fetching indicator
+// FIXME: reset when already reset
 // TODO: deep merge
 // TODO: sync equivalent
 // TODO: derived: promises
@@ -49,13 +50,17 @@ function createReducer<Props, Data, Suspend>(
 				switch (action.type) {
 					case 'abort':
 						if (query.suspend) return
-						contoller?.abort()
+						if (!contoller) return
+						contoller.abort()
+						globalFetch.send(-1)
 					case 'fetch':
+						globalFetch.send(1)
 						contoller = new AbortController()
 						query.api
 							.get?.(props, contoller.signal)
 							.then((data) => {
 								if (contoller.signal.aborted) return
+								globalFetch.send(-1)
 								query.api.set?.(props, data)
 								r.send({
 									type: 'success',
@@ -64,6 +69,7 @@ function createReducer<Props, Data, Suspend>(
 							})
 							.catch((payload) => {
 								if (contoller.signal.aborted) return
+								globalFetch.send(-1)
 								r.send({ type: 'error', payload })
 								query.onError?.(payload)
 							})
