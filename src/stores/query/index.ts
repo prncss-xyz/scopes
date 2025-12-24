@@ -4,7 +4,7 @@ import { reducer, ReducerStore } from '../reducer'
 import { exhaustive, type Reset } from '../../functions'
 import { Suspended, suspended } from './suspended'
 import { primitive } from '../primitive'
-import { globalFetch } from './globalFetch'
+import { globalFetchingStore } from './globalFetching'
 import { Observable } from '../observable'
 
 const defaultTTL = 5 * 60 * 1000
@@ -12,6 +12,7 @@ const defaultStaleTime = 0
 
 // FIXME: reset when already reset
 // REFACT: move promise to Suspend
+// FEAT: better abort logic
 // FEAT: deep merge
 // FEAT: sync equivalent
 // FEAT: derived: promises
@@ -53,15 +54,15 @@ function createReducer<Props, Data, Suspend>(
 						if (suspend) return
 						if (!contoller) return
 						contoller.abort()
-						globalFetch.send(-1)
+						globalFetchingStore.send(-1)
 					case 'fetch':
-						globalFetch.send(1)
+						globalFetchingStore.send(1)
 						contoller = new AbortController()
 						api
 							.get?.(props, contoller.signal)
 							.then((data) => {
 								if (contoller.signal.aborted) return
-								globalFetch.send(-1)
+								globalFetchingStore.send(-1)
 								api.set?.(props, data)
 								r.send({
 									type: 'success',
@@ -70,7 +71,7 @@ function createReducer<Props, Data, Suspend>(
 							})
 							.catch((payload) => {
 								if (contoller.signal.aborted) return
-								globalFetch.send(-1)
+								globalFetchingStore.send(-1)
 								r.send({ type: 'error', payload })
 								api.onError?.(props, payload)
 							})

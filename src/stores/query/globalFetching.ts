@@ -1,7 +1,7 @@
 import { noop } from '../../functions'
 import { reducer } from '../reducer'
 
-export const globalFetch = reducer({
+export const globalFetchingStore = reducer({
 	reducer: {
 		init: 0,
 		reduce: (event: number, last) => {
