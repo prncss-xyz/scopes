@@ -3,11 +3,6 @@ import { exhaustive, RESET, type Modify, type Reset } from '../../functions'
 export type State<Data> = (
 	| {
 			type: 'pending'
-			payload: {
-				resolve: (data: Data) => void
-				reject: (error: unknown) => void
-				promise: Promise<Data>
-			}
 	  }
 	| {
 			type: 'error'
@@ -18,7 +13,6 @@ export type State<Data> = (
 			payload: {
 				data: Data
 				since: number
-				promise?: Promise<Data>
 			}
 	  }
 ) & {
@@ -28,7 +22,13 @@ export type State<Data> = (
 
 export type Event<Data> =
 	| {
-			type: 'reset' | 'invalidate' | 'prefetch' | 'abort' | '_unmount' | 'delete'
+			type:
+				| 'reset'
+				| 'invalidate'
+				| 'prefetch'
+				| 'abort'
+				| '_unmount'
+				| 'delete'
 	  }
 	| { type: 'update'; payload: Modify<Data> }
 	| {
@@ -63,7 +63,6 @@ export function queryMachine<Data>() {
 			type: 'pending',
 			fetching: false,
 			mounted: false,
-			payload: Promise.withResolvers<Data>(),
 		}
 	}
 	function reduce0(
@@ -96,16 +95,11 @@ export function queryMachine<Data>() {
 					type: 'pending',
 					fetching: state.mounted,
 					mounted: state.mounted,
-					payload: Promise.withResolvers<Data>(),
 				}
 			case 'success':
 				return {
 					type: 'success',
-					payload: {
-						...event.payload,
-						promise:
-							state.type === 'pending' ? state.payload.promise : undefined,
-					},
+					payload: event.payload,
 					mounted: state.mounted,
 					fetching: false,
 				}
@@ -120,10 +114,9 @@ export function queryMachine<Data>() {
 					mounted: true,
 				}
 			case '_unmount':
-        // TODO: Do we want to stop fetching on unmount?
+				// TODO: Do we want to stop fetching on unmount?
 				return { ...state, mounted: false, fetching: false }
 			case 'delete':
-        // TODO: make it happen before reducer
 				act({ type: 'delete' })
 				return state
 			default:
@@ -138,10 +131,6 @@ export function queryMachine<Data>() {
 		const next = reduce0(event, last, act)
 		if (next.fetching && !last.fetching) act({ type: 'fetch' })
 		if (!next.fetching && last.fetching) act({ type: 'abort' })
-		if (last.type === 'pending') {
-			if (next.type === 'success') last.payload.resolve(next.payload.data)
-			if (next.type === 'error') last.payload.reject(next.payload)
-		}
 		const lastData = last.type === 'success' ? last.payload.data : RESET
 		const nextData = next.type === 'success' ? next.payload.data : RESET
 		if (!Object.is(nextData, lastData)) {

@@ -1,19 +1,16 @@
 import { collection } from '../../collection'
 import { queryMachine, type State, type Event } from './machine'
 import { reducer } from '../reducer'
-import { exhaustive, type Init, type Reset } from '../../functions'
+import { exhaustive, isReset, type Reset } from '../../functions'
 import { globalFetchingStore } from './globalFetching'
 import { Observable } from '../observable'
-import { suspended } from './suspended'
-import { primitiveWithOnPeek } from './primitiveWithOnPeek'
-import type { OnMount } from '../../mount'
+import { primitive } from '../primitive'
+import { mappedStore } from '../mapped'
 
 const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
 
 // FEAT: sync equivalent
-// FEAT: prefetch on creation; action to delete single entry
-// REFACT: move promise to Suspend
 // FEAT: deep merge
 
 export interface StorageProps<Props, Data> {
@@ -30,20 +27,7 @@ export type QueryProps<Props, Data> = {
 	api: StorageProps<Props, Data>
 }
 
-function primitive<Data>(
-	action: () => void,
-	init: Init<State<Data>>,
-	onMount?: OnMount,
-) {
-	return primitiveWithOnPeek(
-		init,
-		(state) => state.type === 'pending' && !state.fetching,
-		action,
-		onMount,
-	)
-}
-
-function createReducer<Props, Data>(
+function createQueryReducer<Props, Data>(
 	{ api, staleTime }: QueryProps<Props, Data>,
 	props: Props,
 	observable: Observable<
@@ -55,12 +39,12 @@ function createReducer<Props, Data>(
 	},
 ) {
 	let contoller: AbortController
-	const get = reducer(
+	let resolvers: ReturnType<typeof Promise.withResolvers<Data>> | undefined
+	const base = reducer(
 		{
 			reducer: queryMachine<Data>(),
 			createStore: (init, onMount) => {
-				return primitive(
-					() => get.send({ type: 'prefetch' }),
+				return primitive<State<Data>>(
 					payload
 						? {
 								type: 'success',
@@ -95,11 +79,19 @@ function createReducer<Props, Data>(
 							.catch((payload) => {
 								if (contoller.signal.aborted) return
 								globalFetchingStore.send(-1)
+								if (resolvers) {
+									resolvers.reject(payload)
+									resolvers = undefined
+								}
 								send({ type: 'error', payload })
 								api.onError?.(props, payload)
 							})
 						return
 					case 'data':
+						if (!isReset(action.payload.next) && resolvers) {
+							resolvers.resolve(action.payload.next)
+							resolvers = undefined
+						}
 						observable.emit(props, action.payload.next, action.payload.last)
 						return
 					case 'delete':
@@ -122,17 +114,33 @@ function createReducer<Props, Data>(
 			return () => send({ type: '_unmount' })
 		},
 	)
-	return get
+	const suspend = mappedStore(base, (state) => {
+		switch (state.type) {
+			case 'success':
+				return state.payload.data
+			case 'error':
+				throw state.payload
+			case 'pending':
+				if (!resolvers) {
+					resolvers = Promise.withResolvers<Data>()
+					Promise.resolve().then(() => base.send({ type: 'prefetch' }))
+				}
+				return resolvers.promise
+			default:
+				return exhaustive(state)
+		}
+	})
+	return { base, suspend }
 }
 
 const sendQueriesCallbacks: ((
 	filter: (props: unknown) => boolean,
-	event: Event<never>,
+	event: Event<any>,
 ) => void)[] = []
 
 export function sendQueries(
 	filter: (props: unknown) => boolean,
-	event: Event<never>, // TODO: actually remove update and success events
+	event: Event<any> & { type: Exclude<string, 'update' | 'success'> },
 ) {
 	sendQueriesCallbacks.forEach((callback) => callback(filter, event))
 }
@@ -145,20 +153,20 @@ export function query<Props, Data>(
 		[props: Props, next: Data | Reset, last: Data | Reset]
 	>()
 	const c = collection(
-		(props: Props) => createReducer(queryProps, props, observable),
+		(props: Props) => createQueryReducer(queryProps, props, observable),
 		{
 			ttl: queryProps.ttl ?? defaultTTL,
 			hydrate: hydrate
 				? {
 						values: hydrate,
 						decode: (payload, props) =>
-							createReducer(queryProps, props, observable, payload),
+							createQueryReducer(queryProps, props, observable, payload),
 					}
 				: undefined,
 			onMount: queryProps.api.observe
 				? () =>
 						queryProps.api.observe!((p, data) =>
-							c.get(p).send({
+							c.get(p).base.send({
 								type: 'success',
 								payload: { data, since: Date.now() },
 							}),
@@ -166,14 +174,14 @@ export function query<Props, Data>(
 				: undefined,
 		},
 	)
-	function send(filter: (props: Props) => boolean, event: Event<Data>) {
-		c.forEach((key, store) => filter(key) && store.send(event))
+	function sendQuery(filter: (props: Props) => boolean, event: Event<Data>) {
+		c.forEach((key, store) => filter(key) && store.base.send(event))
 	}
-	sendQueriesCallbacks.push(send as any)
+	sendQueriesCallbacks.push(sendQuery)
 	return {
-		get: (props: Props) => c.get(props),
-		suspend: (props: Props) => suspended(c.get(props)),
+		base: (props: Props) => c.get(props).base,
+		suspend: (props: Props) => c.get(props).suspend,
 		observe: observable.observe.bind(observable),
-		send,
+		sendQuery,
 	}
 }

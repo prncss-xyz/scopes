@@ -1,4 +1,5 @@
 import { Store } from './store'
+import { Subscribed } from './subscribed'
 
 export function mappedStore<Value, V, Args extends any[], Result>(
 	store: Store<Value, Args, Result>,
@@ -7,7 +8,7 @@ export function mappedStore<Value, V, Args extends any[], Result>(
 	return new MappedStore(store, mapper)
 }
 
-class MappedStore<Value, V, Args extends any[], Result> extends Store<
+class MappedStore<Value, V, Args extends any[], Result> extends Subscribed<
 	V,
 	Args,
 	Result
