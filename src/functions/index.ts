@@ -40,3 +40,7 @@ export function isReset(value: unknown): value is Reset {
 
 export type SetStateWithReset<T> = SetState<T> | Reset
 export type OnChange<T> = (next: T | Reset, last: T) => void
+
+export function defer(callback: () => void) {
+	Promise.resolve().then(callback)
+}

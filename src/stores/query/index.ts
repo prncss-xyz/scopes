@@ -12,6 +12,7 @@ const defaultStaleTime = 0
 
 // FEAT: sync equivalent
 // FEAT: deep merge
+// TODO: make suspend fail on cancelation
 
 export interface StorageProps<Props, Data> {
 	get?: (props: Props, signal: AbortSignal) => Promise<Data>
@@ -62,6 +63,9 @@ function createQueryReducer<Props, Data>(
 						if (!contoller) return
 						contoller.abort()
 						globalFetchingStore.send(-1)
+            // TODO: is it the right behavior here?
+						resolvers?.reject(new Error('aborted'))
+						return
 					case 'fetch':
 						globalFetchingStore.send(1)
 						contoller = new AbortController()

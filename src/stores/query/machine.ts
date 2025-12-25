@@ -65,7 +65,7 @@ export function queryMachine<Data>() {
 			mounted: false,
 		}
 	}
-	function reduce0(
+	function reduce(
 		event: Event<Data>,
 		state: State<Data>,
 		act: (action: Action<Data>) => void,
@@ -114,7 +114,6 @@ export function queryMachine<Data>() {
 					mounted: true,
 				}
 			case '_unmount':
-				// TODO: Do we want to stop fetching on unmount?
 				return { ...state, mounted: false, fetching: false }
 			case 'delete':
 				act({ type: 'delete' })
@@ -123,12 +122,11 @@ export function queryMachine<Data>() {
 				return exhaustive(event)
 		}
 	}
-	function reduce(
-		event: Event<Data>,
+	function react(
+		next: State<Data>,
 		last: State<Data>,
 		act: (action: Action<Data>) => void,
 	) {
-		const next = reduce0(event, last, act)
 		if (next.fetching && !last.fetching) act({ type: 'fetch' })
 		if (!next.fetching && last.fetching) act({ type: 'abort' })
 		const lastData = last.type === 'success' ? last.payload.data : RESET
@@ -136,10 +134,10 @@ export function queryMachine<Data>() {
 		if (!Object.is(nextData, lastData)) {
 			act({ type: 'data', payload: { next: nextData, last: lastData } })
 		}
-		return next
 	}
 	return {
 		init,
 		reduce,
+    react
 	}
 }
