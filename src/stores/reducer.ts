@@ -1,4 +1,4 @@
-import { forbidden, noop, type Init } from '../functions'
+import { noop, type Init } from '../functions'
 import { type OnMount, type Teardown } from '../mount'
 import { primitive, type ValueStore } from './primitive'
 import { Store } from './store'
@@ -66,18 +66,14 @@ export class ReducerStore<State, Event, Result, Action> extends Store<
 		this.#act = act
 	}
 	send(event: Event) {
+		const actions: Action[] = []
 		const last = this.store.peek()
-		const next = this.#reduce(
-			event,
-			last,
-			this.#act
-				? (action) =>
-						Promise.resolve().then(() => {
-							return this.#act!(action, this.send.bind(this))
-						})
-				: forbidden,
-		)
+		const next = this.#reduce(event, last, (action) => actions.push(action))
 		this.store.send(next)
+		if (actions.length > 0)
+			Promise.resolve().then(() =>
+				actions.forEach((action) => this.#act!(action, this.send.bind(this))),
+			)
 	}
 	canSend(event: Event) {
 		const last = this.store.peek()
