@@ -1,5 +1,4 @@
-import { assertion } from '../assertion'
-import { noop, type Init } from '../functions'
+import { forbidden, noop, type Init } from '../functions'
 import { type OnMount, type Teardown } from '../mount'
 import { primitive, type ValueStore } from './primitive'
 import { Store } from './store'
@@ -14,7 +13,6 @@ interface ReducerValues<State, Event, Result, Action> {
 	init: Init<State>
 	reduce: (event: Event, last: State, act: (action: Action) => void) => State
 	result?: (value: State) => Result
-	react?: (next: State, last: State, act: (action: Action) => void) => void
 }
 
 type ReducerProps<State, Event, Result, Action> = {
@@ -51,7 +49,6 @@ export class ReducerStore<State, Event, Result, Action> extends Store<
 	store
 	#reduce
 	#result
-	#react
 	#act
 	constructor(
 		createStore: (init: Init<State>, onMount?: OnMount) => ValueStore<State>,
@@ -66,20 +63,20 @@ export class ReducerStore<State, Event, Result, Action> extends Store<
 		)
 		this.#reduce = reducer.reduce
 		this.#result = reducer.result
-		this.#react = reducer.react
 		this.#act = act
 	}
-	#call(action: Action) {
-		Promise.resolve().then(() => {
-			assertion(this.#act)
-			return this.#act(action, this.send.bind(this))
-		})
-	}
 	send(event: Event) {
-		const call = this.#call.bind(this)
 		const last = this.store.peek()
-		const next = this.#reduce(event, last, call)
-		this.#react?.(next, last, call)
+		const next = this.#reduce(
+			event,
+			last,
+			this.#act
+				? (action) =>
+						Promise.resolve().then(() => {
+							return this.#act!(action, this.send.bind(this))
+						})
+				: forbidden,
+		)
 		this.store.send(next)
 	}
 	canSend(event: Event) {

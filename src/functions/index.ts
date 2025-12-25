@@ -4,6 +4,10 @@ export function id<T>(t: T) {
 	return t
 }
 
+export function forbidden(x: any): never {
+	throw new Error(`unexpected codepath with value: ${x}`)
+}
+
 export function exhaustive(x: never): never {
 	throw new Error(`unexpected value: ${x}`)
 }

@@ -1,4 +1,4 @@
-import { exhaustive, RESET, type Modify, type Reset } from '../../functions'
+import { exhaustive, type Modify } from '../../functions'
 
 export type State<Data> = (
 	| {
@@ -51,8 +51,8 @@ export type Action<Data> =
 	| {
 			type: 'data'
 			payload: {
-				next: Data | Reset
-				last: Data | Reset
+				next: Data | undefined
+				last: Data | undefined
 			}
 	  }
 	| { type: 'fetch' | 'abort' | 'delete' }
@@ -65,7 +65,7 @@ export function queryMachine<Data>() {
 			mounted: false,
 		}
 	}
-	function reduce(
+	function reduce0(
 		event: Event<Data>,
 		state: State<Data>,
 		act: (action: Action<Data>) => void,
@@ -127,17 +127,25 @@ export function queryMachine<Data>() {
 		last: State<Data>,
 		act: (action: Action<Data>) => void,
 	) {
-		if (next.fetching && !last.fetching) act({ type: 'fetch' })
-		if (!next.fetching && last.fetching) act({ type: 'abort' })
-		const lastData = last.type === 'success' ? last.payload.data : RESET
-		const nextData = next.type === 'success' ? next.payload.data : RESET
-		if (!Object.is(nextData, lastData)) {
+		if (next.fetching !== last.fetching)
+			act({ type: next.fetching ? 'fetch' : 'abort' })
+
+		const lastData = last.type === 'success' ? last.payload.data : undefined
+		const nextData = next.type === 'success' ? next.payload.data : undefined
+		if (!Object.is(nextData, lastData))
 			act({ type: 'data', payload: { next: nextData, last: lastData } })
-		}
+	}
+	function reduce(
+		event: Event<Data>,
+		state: State<Data>,
+		act: (action: Action<Data>) => void,
+	): State<Data> {
+		const next = reduce0(event, state, act)
+		react(next, state, act)
+		return next
 	}
 	return {
 		init,
 		reduce,
-    react
 	}
 }

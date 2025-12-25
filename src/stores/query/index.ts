@@ -1,7 +1,7 @@
 import { collection } from '../../collection'
 import { queryMachine, type State, type Event } from './machine'
 import { reducer } from '../reducer'
-import { exhaustive, isReset, type Reset } from '../../functions'
+import { exhaustive } from '../../functions'
 import { globalFetchingStore } from './globalFetching'
 import { Observable } from '../observable'
 import { primitive } from '../primitive'
@@ -32,7 +32,7 @@ function createQueryReducer<Props, Data>(
 	{ api, staleTime }: QueryProps<Props, Data>,
 	props: Props,
 	observable: Observable<
-		[props: Props, next: Data | Reset, last: Data | Reset]
+		[props: Props, next: Data | undefined, last: Data | undefined]
 	>,
 	payload?: {
 		data: Data
@@ -63,8 +63,8 @@ function createQueryReducer<Props, Data>(
 						if (!contoller) return
 						contoller.abort()
 						globalFetchingStore.send(-1)
-            // TODO: is it the right behavior here?
-						resolvers?.reject(new Error('aborted'))
+						// TODO: is it the right behavior here?
+						resolvers?.reject(new Error('aborted query'))
 						return
 					case 'fetch':
 						globalFetchingStore.send(1)
@@ -92,7 +92,7 @@ function createQueryReducer<Props, Data>(
 							})
 						return
 					case 'data':
-						if (!isReset(action.payload.next) && resolvers) {
+						if (action.payload.next !== undefined && resolvers) {
 							resolvers.resolve(action.payload.next)
 							resolvers = undefined
 						}
@@ -154,7 +154,7 @@ export function query<Props, Data>(
 	hydrate?: Iterable<[Props, { data: Data; since: number }]>,
 ) {
 	const observable = new Observable<
-		[props: Props, next: Data | Reset, last: Data | Reset]
+		[props: Props, next: Data | undefined, last: Data | undefined]
 	>()
 	const c = collection(
 		(props: Props) => createQueryReducer(queryProps, props, observable),
