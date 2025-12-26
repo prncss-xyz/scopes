@@ -3,7 +3,7 @@ import { useStore, useStoreValue } from '../../stores/react'
 import { Suspense } from 'react'
 import { storage } from './storage'
 import { Json } from '../Json'
-import { globalFetchingStore } from '../../stores/query/globalFetching'
+import { globalFetchingStore } from '../../stores/query'
 
 function GlobalFetching() {
 	const globalFetching = useStoreValue(globalFetchingStore)

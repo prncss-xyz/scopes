@@ -3,58 +3,64 @@ import { type OnMount, type Teardown } from '../mount'
 import { primitive, type ValueStore } from './primitive'
 import { Store } from './store'
 
-type LocalOnMount<Event> = (send: (event: Event) => void) => Teardown
+type LocalOnMount<EventIn> = (send: (event: EventIn) => void) => Teardown
 
-export type Reducer<Props, State, Event, Result, Action> = (
+type NonUnderscore<S> = S extends `_${string}` ? never : S
+export type Public<E> = E extends { type: string }
+	? E & { type: NonUnderscore<E['type']> }
+	: E
+
+export type Reducer<Props, State, EventIn, Result, EventOut> = (
 	props: Props,
-) => ReducerValues<State, Event, Result, Action>
+) => ReducerValues<State, EventIn, Result, EventOut>
 
-interface ReducerValues<State, Event, Result, Action> {
+interface ReducerValues<State, EventIn, Result, EventOut> {
 	init: Init<State>
-	reduce: (event: Event, last: State, act: (action: Action) => void) => State
+	reduce: (event: EventIn, last: State, send: (eventOut: EventOut) => void) => State
 	result?: (value: State) => Result
 }
 
-type ReducerProps<State, Event, Result, Action> = {
-	reducer: ReducerValues<State, Event, Result, Action>
+type ReducerProps<State, EventIn, Result, EventOut> = {
+	reducer: ReducerValues<State, EventIn, Result, EventOut>
 	createStore?: (init: Init<State>, onMount?: OnMount) => ValueStore<State>
-	act?: (action: Action, send: (event: Event) => void) => void
+	onSend?: (eventOut: EventOut, send: (event: EventIn) => void) => void
 }
 
-export function reducer<State, Event, Action extends never, Result = State>(
-	props: ReducerProps<State, Event, Result, Action>,
-	onMount?: LocalOnMount<Event>,
-): ReducerStore<State, Event, Result, Action>
-export function reducer<State, Event, Action extends unknown, Result = State>(
-	props: ReducerProps<State, Event, Result, Action> & { act: any },
-	onMount?: LocalOnMount<Event>,
-): ReducerStore<State, Event, Result, Action>
-export function reducer<State, Event, Action, Result>(
-	props: ReducerProps<State, Event, Result, Action>,
-	onMount?: LocalOnMount<Event>,
+// TODO: have a sendable param and make Public act when it's there
+export function reducer<State, EventIn, EventOut extends never, Result = State>(
+	props: ReducerProps<State, EventIn, Result, EventOut>,
+	onMount?: LocalOnMount<EventIn>,
+): ReducerStore<State, Public<EventIn>, Result, EventOut>
+export function reducer<State, EventIn, EventOut extends unknown, Result = State>(
+	props: ReducerProps<State, EventIn, Result, EventOut> & { onSend: any },
+	onMount?: LocalOnMount<EventIn>,
+): ReducerStore<State, Public<EventIn>, Result, EventOut>
+export function reducer<State, EventIn, EventOut, Result>(
+	props: ReducerProps<State, EventIn, Result, EventOut>,
+	onMount?: LocalOnMount<EventIn>,
 ) {
 	return new ReducerStore(
 		props.createStore ?? primitive<State>,
 		props.reducer,
-		'act' in props ? props.act : undefined,
+		'onSend' in props ? props.onSend : undefined,
 		onMount,
 	)
 }
 
-export class ReducerStore<State, Event, Result, Action> extends Store<
+export class ReducerStore<State, EventIn, Result, EventOut> extends Store<
 	Result,
-	[Event],
+	[EventIn],
 	void
 > {
 	store
 	#reduce
 	#result
-	#act
+	#onSend
 	constructor(
 		createStore: (init: Init<State>, onMount?: OnMount) => ValueStore<State>,
-		reducer: ReducerValues<State, Event, Result, Action>,
-		act?: (action: Action, send: (event: Event) => void) => void,
-		onMount?: LocalOnMount<Event>,
+		reducer: ReducerValues<State, EventIn, Result, EventOut>,
+		onSend?: (eventOut: EventOut, send: (eventIn: EventIn) => void) => void,
+		onMount?: LocalOnMount<EventIn>,
 	) {
 		super()
 		this.store = createStore(
@@ -63,27 +69,27 @@ export class ReducerStore<State, Event, Result, Action> extends Store<
 		)
 		this.#reduce = reducer.reduce
 		this.#result = reducer.result
-		this.#act = act
+		this.#onSend = onSend
 	}
-	send(event: Event) {
-		const actions: Action[] = []
+	send(event: EventIn) {
+		const eventsOut: EventOut[] = []
 		const last = this.store.peek()
-		const next = this.#reduce(event, last, (action) => actions.push(action))
+		const next = this.#reduce(event, last, (eventOut) => eventsOut.push(eventOut))
 		this.store.send(next)
-		if (actions.length > 0)
+		if (eventsOut.length > 0)
 			Promise.resolve().then(() =>
-				actions.forEach((action) => this.#act!(action, this.send.bind(this))),
+				eventsOut.forEach((eventOut) => this.#onSend!(eventOut, this.send.bind(this))),
 			)
 	}
-	canSend(event: Event) {
+	canSend(event: EventIn) {
 		const last = this.store.peek()
-		let acted = false
+		let dirty = false
 		const next = this.#reduce(event, last, () => {
-			acted = true
+			dirty = true
 		})
-		return acted || !Object.is(next, last)
+		return dirty || !Object.is(next, last)
 	}
-	simulate(event: Event) {
+	simulate(event: EventIn) {
 		const last = this.store.peek()
 		const next = this.#reduce(event, last, noop)
 		return this.#result ? this.#result(next) : (next as never)

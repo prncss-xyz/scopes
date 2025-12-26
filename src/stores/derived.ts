@@ -110,13 +110,10 @@ class EffectStore extends Counted<void, [never], never> {
 		throw new Error('Cannot send to an effect store')
 	}
 	protected mount() {
-		this.#teardownHandler = this.#handler.subscribe(() =>
-			// TODO: does this need to be async?
-			Promise.resolve().then(() => {
-				this.#teardownEffect?.()
-				this.#teardownEffect = this.#handler.peek()
-			}),
-		)
+		this.#teardownHandler = this.#handler.subscribe(() => {
+			this.#teardownEffect?.()
+			this.#teardownEffect = this.#handler.peek()
+		})
 		this.#teardownEffect = this.#handler.peek()
 	}
 	protected unmount() {

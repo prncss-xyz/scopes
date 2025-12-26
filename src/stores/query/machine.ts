@@ -1,61 +1,39 @@
 import { exhaustive, type Modify } from '../../functions'
+import type { Tags } from '../../tags/core'
 
-export type State<Data> = (
-	| {
-			type: 'pending'
-	  }
-	| {
-			type: 'error'
-			payload: unknown
-	  }
-	| {
-			type: 'success'
-			payload: {
-				data: Data
-				since: number
-			}
-	  }
-) & {
-	mounted: boolean
-	fetching: boolean
+export type State<Data> = Tags<
+	{
+		pending: void
+		error: unknown
+		success: { data: Data; since: number }
+	},
+	{ mounted: boolean; fetching: boolean }
+>
+
+export type EventIn<Data> = Tags<{
+	reset: void
+	invalidate: void
+	prefetch: void
+	abort: void
+	_unmount: void
+	delete: void
+	update: Modify<Data>
+	focus: number
+	_mount: number
+	success: { data: Data; since: number }
+	error: unknown
+}>
+
+export type EventOut<Data> = Tags<{
+	fetch: void
+	abort: void
+	delete: void
+	data: { next: Data | undefined; last: Data | undefined }
+}>
+
+function shouldFetch<Data>(state: State<Data>, event: { payload: number }) {
+	return !(state.type === 'success' && event.payload < state.payload.since)
 }
-
-export type Event<Data> =
-	| {
-			type:
-				| 'reset'
-				| 'invalidate'
-				| 'prefetch'
-				| 'abort'
-				| '_unmount'
-				| 'delete'
-	  }
-	| { type: 'update'; payload: Modify<Data> }
-	| {
-			type: '_mount'
-			payload: number
-	  }
-	| {
-			type: 'success'
-			payload: {
-				data: Data
-				since: number
-			}
-	  }
-	| {
-			type: 'error'
-			payload: unknown
-	  }
-
-export type Action<Data> =
-	| {
-			type: 'data'
-			payload: {
-				next: Data | undefined
-				last: Data | undefined
-			}
-	  }
-	| { type: 'fetch' | 'abort' | 'delete' }
 
 export function queryMachine<Data>() {
 	function init(): State<Data> {
@@ -66,9 +44,9 @@ export function queryMachine<Data>() {
 		}
 	}
 	function reduce0(
-		event: Event<Data>,
+		event: EventIn<Data>,
 		state: State<Data>,
-		act: (action: Action<Data>) => void,
+		act: (action: EventOut<Data>) => void,
 	): State<Data> {
 		switch (event.type) {
 			case 'abort':
@@ -105,12 +83,15 @@ export function queryMachine<Data>() {
 				}
 			case 'error':
 				return { ...event, mounted: state.mounted, fetching: false }
+			case 'focus':
+				return {
+					...state,
+					fetching: shouldFetch(state, event),
+				}
 			case '_mount':
 				return {
 					...state,
-					fetching: !(
-						state.type === 'success' && event.payload < state.payload.since
-					),
+					fetching: shouldFetch(state, event),
 					mounted: true,
 				}
 			case '_unmount':
@@ -125,7 +106,7 @@ export function queryMachine<Data>() {
 	function react(
 		next: State<Data>,
 		last: State<Data>,
-		act: (action: Action<Data>) => void,
+		act: (action: EventOut<Data>) => void,
 	) {
 		if (next.fetching !== last.fetching)
 			act({ type: next.fetching ? 'fetch' : 'abort' })
@@ -136,9 +117,9 @@ export function queryMachine<Data>() {
 			act({ type: 'data', payload: { next: nextData, last: lastData } })
 	}
 	function reduce(
-		event: Event<Data>,
+		event: EventIn<Data>,
 		state: State<Data>,
-		act: (action: Action<Data>) => void,
+		act: (action: EventOut<Data>) => void,
 	): State<Data> {
 		const next = reduce0(event, state, act)
 		react(next, state, act)

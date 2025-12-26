@@ -1,22 +1,27 @@
 import { collection } from '../../collection'
-import { queryMachine, type State, type Event } from './machine'
-import { reducer } from '../reducer'
+import { queryMachine, type State, type EventIn } from './machine'
+import { reducer, type Public } from '../reducer'
 import { exhaustive } from '../../functions'
-import { globalFetchingStore } from './globalFetching'
 import { Observable } from '../observable'
 import { primitive } from '../primitive'
 import { mappedStore } from '../mapped'
+import { createReport } from '../createReport'
 
 const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
 
+export const globalFetchingStore = createReport()
+
 // FEAT: sync equivalent
 // FEAT: deep merge
 // TODO: make suspend fail on cancelation
+// TODO: sendable reducer
 
 export interface StorageProps<Props, Data> {
 	get?: (props: Props, signal: AbortSignal) => Promise<Data>
+	// TODO: revert on fail?
 	set?: (props: Props, value: Data) => void
+	// TODO: revert on fail?
 	del?: (props: Props) => Data
 	onError?: (props: Props, error: unknown) => void
 	observe?: (emit: (props: Props, value: Data) => void) => () => void
@@ -28,12 +33,13 @@ export type QueryProps<Props, Data> = {
 	api: StorageProps<Props, Data>
 }
 
-function createQueryReducer<Props, Data>(
+function oneQuery<Props, Data>(
 	{ api, staleTime }: QueryProps<Props, Data>,
 	props: Props,
 	observable: Observable<
 		[props: Props, next: Data | undefined, last: Data | undefined]
 	>,
+	report: (delta: number) => void,
 	payload?: {
 		data: Data
 		since: number
@@ -57,23 +63,23 @@ function createQueryReducer<Props, Data>(
 					onMount,
 				)
 			},
-			act: (action, send) => {
+			onSend: (action, send) => {
 				switch (action.type) {
 					case 'abort':
 						if (!contoller) return
 						contoller.abort()
-						globalFetchingStore.send(-1)
+						report(-1)
 						// TODO: is it the right behavior here?
 						resolvers?.reject(new Error('aborted query'))
 						return
 					case 'fetch':
-						globalFetchingStore.send(1)
+						report(1)
 						contoller = new AbortController()
 						api
 							.get?.(props, contoller.signal)
 							.then((data) => {
 								if (contoller.signal.aborted) return
-								globalFetchingStore.send(-1)
+								report(-1)
 								api.set?.(props, data)
 								send({
 									type: 'success',
@@ -82,7 +88,7 @@ function createQueryReducer<Props, Data>(
 							})
 							.catch((payload) => {
 								if (contoller.signal.aborted) return
-								globalFetchingStore.send(-1)
+								report(-1)
 								if (resolvers) {
 									resolvers.reject(payload)
 									resolvers = undefined
@@ -139,12 +145,12 @@ function createQueryReducer<Props, Data>(
 
 const sendQueriesCallbacks: ((
 	filter: (props: unknown) => boolean,
-	event: Event<any>,
+	event: Public<EventIn<any>>,
 ) => void)[] = []
 
 export function sendQueries(
 	filter: (props: unknown) => boolean,
-	event: Event<any> & { type: Exclude<string, 'update' | 'success'> },
+	event: Public<EventIn<any>> & { type: Exclude<string, 'update' | 'success'> },
 ) {
 	sendQueriesCallbacks.forEach((callback) => callback(filter, event))
 }
@@ -157,14 +163,26 @@ export function query<Props, Data>(
 		[props: Props, next: Data | undefined, last: Data | undefined]
 	>()
 	const c = collection(
-		(props: Props) => createQueryReducer(queryProps, props, observable),
+		(props: Props) =>
+			oneQuery(
+				queryProps,
+				props,
+				observable,
+				globalFetchingStore.send.bind(globalFetchingStore),
+			),
 		{
 			ttl: queryProps.ttl ?? defaultTTL,
 			hydrate: hydrate
 				? {
 						values: hydrate,
 						decode: (payload, props) =>
-							createQueryReducer(queryProps, props, observable, payload),
+							oneQuery(
+								queryProps,
+								props,
+								observable,
+								globalFetchingStore.send.bind(globalFetchingStore),
+								payload,
+							),
 					}
 				: undefined,
 			onMount: queryProps.api.observe
@@ -178,14 +196,17 @@ export function query<Props, Data>(
 				: undefined,
 		},
 	)
-	function sendQuery(filter: (props: Props) => boolean, event: Event<Data>) {
+	function sendSome(
+		filter: (props: Props) => boolean,
+		event: Public<EventIn<Data>>,
+	) {
 		c.forEach((key, store) => filter(key) && store.base.send(event))
 	}
-	sendQueriesCallbacks.push(sendQuery)
+	sendQueriesCallbacks.push(sendSome)
 	return {
 		base: (props: Props) => c.get(props).base,
 		suspend: (props: Props) => c.get(props).suspend,
 		observe: observable.observe.bind(observable),
-		sendQuery,
+		sendSome,
 	}
 }

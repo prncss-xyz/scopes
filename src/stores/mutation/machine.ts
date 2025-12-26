@@ -1,47 +1,56 @@
 import { exhaustive } from '../../functions'
+import type { Tags } from '../../tags/core'
+import { tag } from '../../tags/sendable'
 
-export type State =
-	| { type: 'idle' | 'pending' | 'success' }
-	| { type: 'error'; payload: unknown }
+export type State = Tags<{
+	idle: void
+	pending: void
+	success: void
+	error: unknown
+}>
 
-export type Event<Props> =
-	| {
-			type: 'abort' | 'success'
-	  }
-	| { type: 'error'; payload: unknown }
-	| { type: 'mutate'; payload: Props }
+export type EventIn<Props, Data> = Tags<{
+	abort: void
+	_success: void
+	_error: unknown
+	mutate: {
+		onSuccess?: (data: Data, props: Props) => void
+		onError?: (error: unknown, props: Props) => void
+	}
+}>
 
-export type Action<Props> =
-	| {
-			type: 'mutate'
-			payload: Props
-	  }
-	| { type: 'abort' }
+export type EventOut<Props, Data> = Tags<{
+	mutate: {
+		onSuccess?: (data: Data, props: Props) => void
+		onError?: (error: unknown, props: Props) => void
+	}
+	abort: void
+}>
 
-export function mutationMachine<Props>() {
+export function mutationMachine<Props, Data>() {
 	function init(): State {
 		return {
 			type: 'idle',
 		}
 	}
 	function reduce(
-		event: Event<Props>,
+		event: EventIn<Props, Data>,
 		state: State,
-		act: (action: Action<Props>) => void,
+		act: (action: EventOut<Props, Data>) => void,
 	): State {
 		switch (event.type) {
 			case 'mutate':
 				if (state.type === 'pending') return state
-				act({ type: 'mutate', payload: event.payload })
-				return { type: 'pending' }
-			case 'error':
-				return { type: 'error', payload: event.payload }
-			case 'success':
-				return { type: 'success' }
+				act(event)
+        return tag('pending')
+			case '_error':
+        return tag('error', event.payload)
+			case '_success':
+				return tag('success')
 			case 'abort':
 				if (state.type !== 'pending') return state
-				act({ type: 'abort' })
-				return { ...state, type: 'idle' }
+				act(tag('abort'))
+				return tag('idle')
 			default:
 				return exhaustive(event)
 		}
