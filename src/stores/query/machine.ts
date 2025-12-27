@@ -1,14 +1,11 @@
 import { exhaustive, type Modify } from '../../functions'
 import type { Tags } from '../../tags/core'
 
-export type State<Data> = Tags<
-	{
-		pending: void
-		error: unknown
-		success: { data: Data; since: number }
-	},
-	{ mounted: boolean; fetching: boolean }
->
+export type State<Data> = Tags<{
+	pending: void
+	error: unknown
+	success: { data: Data; since: number }
+}> & { mounted: boolean; fetching: boolean }
 
 export type EventIn<Data> = Tags<{
 	reset: void

@@ -27,6 +27,4 @@ export type PayloadOf<T extends AnyTag, Type extends TypeIn<T>> = (T & {
 	[TYPE]: Type
 })[Payload]
 
-export type Tags<O, Context = unknown> = Prettify<
-	ValueUnion<{ [K in keyof O]: Tag<K, O[K]> }> & Context
->
+export type Tags<O> = ValueUnion<{ [K in keyof O]: Tag<K, O[K]> }>

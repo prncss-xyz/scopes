@@ -9,8 +9,8 @@ export type Equals<T, U> = [T] extends [U]
 	: never
 
 export type ValueUnion<T> = Prettify<T[keyof T]>
-// Type of the intersection of the values
 
+// Type of the intersection of the values
 export type ValueIntersection<T> = Prettify<
 	{
 		[K in keyof T]: (x: T[K]) => void
@@ -51,10 +51,3 @@ export type OptionalUndefined<T> = Prettify<
 		[K in keyof T as undefined extends T[K] ? never : K]: T[K]
 	}
 >
-
-// TODO: maybe remove
-export type FromResulter<T> = T extends (u: any) => u is infer R
-	? R
-	: T extends (u: any) => infer R
-		? R
-		: never

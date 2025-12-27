@@ -6,6 +6,7 @@ import { Observable } from '../observable'
 import { primitive } from '../primitive'
 import { mappedStore } from '../mapped'
 import { createReport } from '../createReport'
+import { tag } from '../../tags/tag'
 
 const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
@@ -81,10 +82,7 @@ function oneQuery<Props, Data>(
 								if (contoller.signal.aborted) return
 								report(-1)
 								api.set?.(props, data)
-								send({
-									type: 'success',
-									payload: { data, since: Date.now() },
-								})
+								send(tag('success', { data, since: Date.now() }))
 							})
 							.catch((payload) => {
 								if (contoller.signal.aborted) return
@@ -188,10 +186,7 @@ export function query<Props, Data>(
 			onMount: queryProps.api.observe
 				? () =>
 						queryProps.api.observe!((p, data) =>
-							c.get(p).base.send({
-								type: 'success',
-								payload: { data, since: Date.now() },
-							}),
+							c.get(p).base.send(tag('success', { data, since: Date.now() })),
 						)
 				: undefined,
 		},

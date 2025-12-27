@@ -1,6 +1,6 @@
 import { exhaustive } from '../../functions'
 import type { Tags } from '../../tags/core'
-import { tag } from '../../tags/sendable'
+import { tag } from '../../tags/tag'
 
 export type State = Tags<{
 	idle: void

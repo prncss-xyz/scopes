@@ -1,27 +1,26 @@
 import type { Tag } from './core'
 
-type GetObject<T> = T extends [PropertyKey] ? Tag<T[0], void> : GetObject0<T>
-type GetObject0<T> = T extends [PropertyKey, unknown]
-	? Tag<T[0], T[1]>
-	: T extends [PropertyKey, ...infer Rest]
-		? Tag<T[0], GetObject0<Rest>>
+type GetObject<Path> = Path extends [PropertyKey]
+	? Tag<Path[0], void>
+	: GetObject0<Path>
+type GetObject0<Path> = Path extends [PropertyKey, unknown]
+	? Tag<Path[0], Path[1]>
+	: Path extends [PropertyKey, ...infer Rest]
+		? Tag<Path[0], GetObject0<Rest>>
 		: never
 
-export function tag<const T extends [PropertyKey, ...any[]]>(
-	...path: T
-): GetObject<T>
+export function tag<
+	const Path extends [PropertyKey, ...PropertyKey[], any] | [PropertyKey],
+>(...path: Path): GetObject<Path>
 export function tag(...path: any): any {
+	if (path.length === 1) {
+		return { type: path[0] }
+	}
 	return tag0(path)
 }
-
 function tag0(path: any): any {
+	if (path.length === 2) return { type: path[0], payload: path[1] }
 	const [type, ...rest] = path
-	if (rest.length === 0) {
-		return { type }
-	}
-	if (rest.length === 1) {
-		return { type, payload: rest[0] }
-	}
 	return { type, payload: tag0(rest) }
 }
 
