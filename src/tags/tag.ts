@@ -1,4 +1,4 @@
-import type { Tag } from './core'
+import type { Tag } from './types'
 
 type GetObject<Path> = Path extends [PropertyKey]
 	? Tag<Path[0], void>

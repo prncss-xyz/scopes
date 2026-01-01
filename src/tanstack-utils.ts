@@ -21,6 +21,7 @@ export function isPlainObject(o: any): o is Record<PropertyKey, unknown> {
 	}
 
 	// If constructor does not have an Object-specific method
+	// eslint-disable-next-line no-prototype-builtins
 	if (!prot.hasOwnProperty('isPrototypeOf')) {
 		return false
 	}

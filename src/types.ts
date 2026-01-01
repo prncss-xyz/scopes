@@ -2,12 +2,6 @@ export type Prettify<T> = unknown & {
 	[K in keyof T]: T[K]
 }
 
-export type Equals<T, U> = [T] extends [U]
-	? [U] extends [T]
-		? unknown
-		: never
-	: never
-
 export type ValueUnion<T> = Prettify<T[keyof T]>
 
 // Type of the intersection of the values

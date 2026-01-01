@@ -1,5 +1,5 @@
 import { exhaustive } from '../../functions'
-import type { Tags } from '../../tags/core'
+import type { Tags } from '../../tags/types'
 import { tag } from '../../tags/tag'
 
 export type State = Tags<{
@@ -13,10 +13,12 @@ export type EventIn<Props, Data> = Tags<{
 	abort: void
 	_success: void
 	_error: unknown
-	mutate: {
-		onSuccess?: (data: Data, props: Props) => void
-		onError?: (error: unknown, props: Props) => void
-	}
+	mutate:
+		| {
+				onSuccess?: (data: Data, props: Props) => void
+				onError?: (error: unknown, props: Props) => void
+		  }
+		| undefined
 }>
 
 export type EventOut<Props, Data> = Tags<{
@@ -41,10 +43,10 @@ export function mutationMachine<Props, Data>() {
 		switch (event.type) {
 			case 'mutate':
 				if (state.type === 'pending') return state
-				act(event)
-        return tag('pending')
+				act(tag('mutate', event.payload ?? {}))
+				return tag('pending')
 			case '_error':
-        return tag('error', event.payload)
+				return tag('error', event.payload)
 			case '_success':
 				return tag('success')
 			case 'abort':

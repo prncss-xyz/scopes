@@ -1,5 +1,5 @@
 import { exhaustive, type Modify } from '../../functions'
-import type { Tags } from '../../tags/core'
+import type { Tags } from '../../tags/types'
 
 export type State<Data> = Tags<{
 	pending: void

@@ -1,7 +1,7 @@
-import { noop, type Init } from '../functions'
-import { type OnMount, type Teardown } from '../mount'
-import { primitive, type ValueStore } from './primitive'
-import { Store } from './store'
+import { noop, type Init } from '../../functions'
+import { type OnMount, type Teardown } from '../../mount'
+import { primitive, type ValueStore } from '../primitive'
+import { Store } from '../store'
 
 type LocalOnMount<EventIn> = (send: (event: EventIn) => void) => Teardown
 
@@ -10,11 +10,11 @@ export type Public<E> = E extends { type: string }
 	? E & { type: NonUnderscore<E['type']> }
 	: E
 
-export type Reducer<Props, State, EventIn, Result, EventOut> = (
+export type Machine<Props, State, EventIn, Result, EventOut> = (
 	props: Props,
-) => ReducerValues<State, EventIn, Result, EventOut>
+) => MachineValues<State, EventIn, Result, EventOut>
 
-interface ReducerValues<State, EventIn, Result, EventOut> {
+interface MachineValues<State, EventIn, Result, EventOut> {
 	init: Init<State>
 	reduce: (
 		event: EventIn,
@@ -24,26 +24,31 @@ interface ReducerValues<State, EventIn, Result, EventOut> {
 	result?: (value: State) => Result
 }
 
-type ReducerProps<State, EventIn, Result, EventOut> = {
-	reducer: ReducerValues<State, EventIn, Result, EventOut>
+type MachineProps<State, EventIn, Result, EventOut> = {
+	reducer: MachineValues<State, EventIn, Result, EventOut>
 	createStore?: (init: Init<State>, onMount?: OnMount) => ValueStore<State>
 	onSend?: (eventOut: EventOut, send: (event: EventIn) => void) => void
 }
 
 // TODO: have a sendable param and make Public act when it's there
-export function reducer<State, EventIn, EventOut extends never, Result = State>(
-	props: ReducerProps<State, EventIn, Result, EventOut>,
+export function machineProps<
+	State,
+	EventIn,
+	EventOut extends never,
+	Result = State,
+>(
+	props: MachineProps<State, EventIn, Result, EventOut>,
 	onMount?: LocalOnMount<EventIn>,
-): ReducerStore<State, Public<EventIn>, Result, EventOut>
-export function reducer<State, EventIn, EventOut, Result = State>(
-	props: ReducerProps<State, EventIn, Result, EventOut> & { onSend: any },
+): MachineStore<State, Public<EventIn>, Result, EventOut>
+export function machineProps<State, EventIn, EventOut, Result = State>(
+	props: MachineProps<State, EventIn, Result, EventOut> & { onSend: any },
 	onMount?: LocalOnMount<EventIn>,
-): ReducerStore<State, Public<EventIn>, Result, EventOut>
-export function reducer<State, EventIn, EventOut, Result>(
-	props: ReducerProps<State, EventIn, Result, EventOut>,
+): MachineStore<State, Public<EventIn>, Result, EventOut>
+export function machineProps<State, EventIn, EventOut, Result>(
+	props: MachineProps<State, EventIn, Result, EventOut>,
 	onMount?: LocalOnMount<EventIn>,
 ) {
-	return new ReducerStore(
+	return new MachineStore(
 		props.createStore ?? primitive<State>,
 		props.reducer,
 		'onSend' in props ? props.onSend : undefined,
@@ -51,7 +56,7 @@ export function reducer<State, EventIn, EventOut, Result>(
 	)
 }
 
-export class ReducerStore<State, EventIn, Result, EventOut> extends Store<
+export class MachineStore<State, EventIn, Result, EventOut> extends Store<
 	Result,
 	[EventIn],
 	void
@@ -62,7 +67,7 @@ export class ReducerStore<State, EventIn, Result, EventOut> extends Store<
 	#onSend
 	constructor(
 		createStore: (init: Init<State>, onMount?: OnMount) => ValueStore<State>,
-		reducer: ReducerValues<State, EventIn, Result, EventOut>,
+		reducer: MachineValues<State, EventIn, Result, EventOut>,
 		onSend?: (eventOut: EventOut, send: (eventIn: EventIn) => void) => void,
 		onMount?: LocalOnMount<EventIn>,
 	) {

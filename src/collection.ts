@@ -20,7 +20,9 @@ export function familly<Key, Props, Payload, Encoded>(
 	return collection((key: Key) => template(factory(key)), opts)
 }
 
-const clearCollectionEntriesCallbacks: ((filter: (u: unknown) => boolean) => void)[] = []
+const clearCollectionEntriesCallbacks: ((
+	filter: (u: unknown) => boolean,
+) => void)[] = []
 export function clearCollectionEntries(filter: (u: unknown) => boolean) {
 	clearCollectionEntriesCallbacks.forEach((clear) => clear(filter))
 }

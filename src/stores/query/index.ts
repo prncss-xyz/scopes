@@ -64,8 +64,8 @@ function oneQuery<Props, Data>(
 					onMount,
 				)
 			},
-			onSend: (action, send) => {
-				switch (action.type) {
+			onSend: (event, send) => {
+				switch (event.type) {
 					case 'abort':
 						if (!contoller) return
 						contoller.abort()
@@ -96,11 +96,11 @@ function oneQuery<Props, Data>(
 							})
 						return
 					case 'data':
-						if (action.payload.next !== undefined && resolvers) {
-							resolvers.resolve(action.payload.next)
+						if (event.payload.next !== undefined && resolvers) {
+							resolvers.resolve(event.payload.next)
 							resolvers = undefined
 						}
-						observable.emit(props, action.payload.next, action.payload.last)
+						observable.emit(props, event.payload.next, event.payload.last)
 						return
 					case 'delete':
 						if (!api.del) return
@@ -110,7 +110,7 @@ function oneQuery<Props, Data>(
 						})
 						return
 					default:
-						exhaustive(action)
+						exhaustive(event)
 				}
 			},
 		},

@@ -2,8 +2,8 @@ import type { OnMount, Teardown } from '../mount'
 
 // FEAT: SSR
 
-export function noWrite(..._: [never]): never {
-	throw new Error('Cannot write to a read-only store')
+export function noWrite(...args: [never]): never {
+	throw new Error(`Cannot write ${args} to a read-only store`)
 }
 
 interface IStore<Value, Args extends any[], Result> {

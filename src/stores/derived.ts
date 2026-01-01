@@ -117,7 +117,7 @@ class EffectStore extends Counted<void, [never], never> {
 		this.#teardownEffect = this.#handler.peek()
 	}
 	protected unmount() {
-		super.unmount
+		super.unmount()
 		this.#teardownEffect?.()
 		this.#teardownEffect = undefined
 		this.#teardownHandler?.()
