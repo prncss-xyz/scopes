@@ -1,18 +1,20 @@
-import { noop, type Init } from '../functions'
-import { type OnMount, type Teardown } from '../mount'
-import type { PublicTag } from '../tags/tag'
-import { primitive, type ValueStore } from './primitive'
-import { Store } from './store'
+import { noop, type Init } from '../../functions'
+import { type OnMount, type Teardown } from '../../mount'
+import { primitive, type ValueStore } from '../primitive'
+import { Store } from '../store'
 
 type LocalOnMount<EventIn> = (send: (event: EventIn) => void) => Teardown
 
-interface ReducerValues<
-	State,
-	EventIn,
-	Result,
-	EventOut,
-	Sendable extends boolean,
-> {
+type NonUnderscore<S> = S extends `_${string}` ? never : S
+export type Public<E> = E extends { type: string }
+	? E & { type: NonUnderscore<E['type']> }
+	: E
+
+export type Machine<Props, State, EventIn, Result, EventOut> = (
+	props: Props,
+) => MachineValues<State, EventIn, Result, EventOut>
+
+interface MachineValues<State, EventIn, Result, EventOut> {
 	init: Init<State>
 	reduce: (
 		event: EventIn,
@@ -20,55 +22,33 @@ interface ReducerValues<
 		send: (eventOut: EventOut) => void,
 	) => State
 	result?: (value: State) => Result
-	sendable?: Sendable
 }
 
-type ReducerProps<
-	State,
-	EventIn,
-	Result,
-	EventOut,
-	Sendable extends boolean,
-> = {
-	reducer: ReducerValues<State, EventIn, Result, EventOut, Sendable>
+type MachineProps<State, EventIn, Result, EventOut> = {
+	reducer: MachineValues<State, EventIn, Result, EventOut>
 	createStore?: (init: Init<State>, onMount?: OnMount) => ValueStore<State>
 	onSend?: (eventOut: EventOut, send: (event: EventIn) => void) => void
 }
 
 // TODO: have a sendable param and make Public act when it's there
-export function reducer<
+export function machineProps<
 	State,
 	EventIn,
 	EventOut extends never,
 	Result = State,
-	Sendable extends boolean = false,
 >(
-	props: ReducerProps<State, EventIn, Result, EventOut, Sendable>,
+	props: MachineProps<State, EventIn, Result, EventOut>,
 	onMount?: LocalOnMount<EventIn>,
-): ReducerStore<State, EventIn, Result, EventOut, Sendable>
-export function reducer<
-	State,
-	EventIn,
-	EventOut,
-	Result = State,
-	Sendable extends boolean = false,
->(
-	props: ReducerProps<State, EventIn, Result, EventOut, Sendable> & {
-		onSend: any
-	},
+): MachineStore<State, Public<EventIn>, Result, EventOut>
+export function machineProps<State, EventIn, EventOut, Result = State>(
+	props: MachineProps<State, EventIn, Result, EventOut> & { onSend: any },
 	onMount?: LocalOnMount<EventIn>,
-): ReducerStore<State, EventIn, Result, EventOut, Sendable>
-export function reducer<
-	State,
-	EventIn,
-	EventOut,
-	Result,
-	Sendable extends boolean,
->(
-	props: ReducerProps<State, EventIn, Result, EventOut, Sendable>,
+): MachineStore<State, Public<EventIn>, Result, EventOut>
+export function machineProps<State, EventIn, EventOut, Result>(
+	props: MachineProps<State, EventIn, Result, EventOut>,
 	onMount?: LocalOnMount<EventIn>,
 ) {
-	return new ReducerStore(
+	return new MachineStore(
 		props.createStore ?? primitive<State>,
 		props.reducer,
 		'onSend' in props ? props.onSend : undefined,
@@ -76,22 +56,18 @@ export function reducer<
 	)
 }
 
-type PublicEvents<E, S> = S extends true ? PublicTag<E> : E
-
-export class ReducerStore<
-	State,
-	EventIn,
+export class MachineStore<State, EventIn, Result, EventOut> extends Store<
 	Result,
-	EventOut,
-	Sendable extends boolean,
-> extends Store<Result, [PublicEvents<EventIn, Sendable>], void> {
+	[EventIn],
+	void
+> {
 	store
 	#reduce
 	#result
 	#onSend
 	constructor(
 		createStore: (init: Init<State>, onMount?: OnMount) => ValueStore<State>,
-		reducer: ReducerValues<State, EventIn, Result, EventOut, Sendable>,
+		reducer: MachineValues<State, EventIn, Result, EventOut>,
 		onSend?: (eventOut: EventOut, send: (eventIn: EventIn) => void) => void,
 		onMount?: LocalOnMount<EventIn>,
 	) {

@@ -1,4 +1,4 @@
-import type { Tag } from './types'
+import { type Tag } from './types'
 
 type GetObject<Path> = Path extends [PropertyKey]
 	? Tag<Path[0], void>
@@ -45,3 +45,8 @@ if (import.meta.vitest) {
 		})
 	})
 }
+
+type NonUnderscore<S> = S extends `_${string}` ? never : S
+export type PublicTag<E> = E extends { type: string }
+	? E & { type: NonUnderscore<E['type']> }
+	: E

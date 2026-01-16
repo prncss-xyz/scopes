@@ -23,13 +23,24 @@ export function dependancy<Key extends PropertyKey, Value>(
 	}
 }
 
-export function inject<T>(fn: (s: Schema<Empty>) => Schema<T>): T {
+export function createContainer<C>(fn: (source: Schema<Empty>) => Schema<C>): C
+export function createContainer<C, P = Empty>(
+	fn: (source: Schema<P>) => Schema<C>,
+	parent: P,
+): C
+export function createContainer(fn: (s: any) => any, parent?: any) {
 	const cache: any = {}
-	const proxy = new Proxy(fn({} as any), {
+	const proxy = new Proxy(fn({}), {
 		get(target: any, prop) {
-			if (prop in cache) return cache[prop]
-			cache[prop] = target[prop](proxy)
-			return cache[prop]
+			if (prop in target) {
+				if (typeof prop === 'string' && prop[0] === '$')
+					return target[prop](proxy)
+				if (prop in cache) return cache[prop]
+				cache[prop] = target[prop](proxy)
+				return cache[prop]
+			}
+			if (parent) return parent[prop]
+			throw new Error(`Property ${String(prop)} not found`)
 		},
 	})
 	return proxy

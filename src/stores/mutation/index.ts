@@ -1,9 +1,10 @@
-import { reducer, type Public } from '../reducer'
+import { reducer } from '../reducer'
 import { exhaustive } from '../../functions'
 import { type OnMount } from '../../mount'
 import { mutationMachine, type EventIn } from './machine'
 import { collection } from '../../collection'
 import { createReport } from '../createReport'
+import type { PublicTag } from '../../tags/tag'
 
 // TODO: Link with query: optimistic update + cancelation
 
@@ -69,7 +70,7 @@ export function mutation<Data, Props>(opts: MutationOpts<Props, Data>) {
 	})
 	function sendSome(
 		filter: (props: Props) => boolean,
-		event: Public<EventIn<Props, Data>>,
+		event: PublicTag<EventIn<Props, Data>>,
 	) {
 		c.forEach((key, store) => filter(key) && store.send(event))
 	}

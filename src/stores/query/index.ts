@@ -1,12 +1,12 @@
 import { collection } from '../../collection'
 import { queryMachine, type State, type EventIn } from './machine'
-import { reducer, type Public } from '../reducer'
+import { reducer } from '../reducer'
 import { exhaustive } from '../../functions'
 import { Observable } from '../observable'
 import { primitive } from '../primitive'
 import { mappedStore } from '../mapped'
 import { createReport } from '../createReport'
-import { tag } from '../../tags/tag'
+import { tag, type PublicTag } from '../../tags/tag'
 
 const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0
@@ -143,12 +143,14 @@ function oneQuery<Props, Data>(
 
 const sendQueriesCallbacks: ((
 	filter: (props: unknown) => boolean,
-	event: Public<EventIn<any>>,
+	event: PublicTag<EventIn<any>>,
 ) => void)[] = []
 
 export function sendQueries(
 	filter: (props: unknown) => boolean,
-	event: Public<EventIn<any>> & { type: Exclude<string, 'update' | 'success'> },
+	event: PublicTag<EventIn<any>> & {
+		type: Exclude<string, 'update' | 'success'>
+	},
 ) {
 	sendQueriesCallbacks.forEach((callback) => callback(filter, event))
 }
@@ -193,7 +195,7 @@ export function query<Props, Data>(
 	)
 	function sendSome(
 		filter: (props: Props) => boolean,
-		event: Public<EventIn<Data>>,
+		event: PublicTag<EventIn<Data>>,
 	) {
 		c.forEach((key, store) => filter(key) && store.base.send(event))
 	}

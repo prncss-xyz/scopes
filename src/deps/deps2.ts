@@ -1,3 +1,4 @@
+// if we want to enumarate keys
 import type { Prettify } from '../types'
 
 type Dep<P> = {
@@ -24,17 +25,20 @@ type Desc<O> = {
 	[P in keyof O]: (o: O) => O[P]
 }
 
-export function inject<T>(fn: (s: Desc<Empty>) => Desc<T>): T
-export function inject<T, S extends Empty>(fn: (s: Desc<S>) => Desc<T>, s: S): T
+export function inject<T>(fn: (source: Desc<Empty>) => Desc<T>): T
+export function inject<T, S extends Empty>(
+	fn: (source: Desc<S>) => Desc<T>,
+	parent: S,
+): T
 export function inject<T, S extends Empty = Empty>(
-	fn: (s: Desc<S>) => Desc<T>,
-	s?: S,
+	fn: (source: Desc<S>) => Desc<T>,
+	parent?: S,
 ): T {
-	const s_ = s || {}
+	const s_ = parent || {}
 	const cache: any = {}
 	const p = new Proxy(fn({} as any), {
 		get(target: any, prop) {
-			if (prop in s_) return (s as any)[prop]
+			if (prop in s_) return (parent as any)[prop]
 			if (prop in cache) return cache[prop]
 			cache[prop] = target[prop](p)
 			return cache[prop]
