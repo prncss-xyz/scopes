@@ -3,7 +3,7 @@ function hasObjectPrototype(o: any): boolean {
 	return Object.prototype.toString.call(o) === '[object Object]'
 }
 
-export function isPlainObject(o: any): o is Record<PropertyKey, unknown> {
+function isPlainObject(o: any): o is Record<PropertyKey, unknown> {
 	if (!hasObjectPrototype(o)) {
 		return false
 	}

@@ -1,6 +1,6 @@
 import { noop, type Init } from '../functions'
 import { type OnMount, type Teardown } from '../mount'
-import type { PublicTag } from '../tags/tag'
+import type { PublicTag } from '../tags/types'
 import { primitive, type ValueStore } from './primitive'
 import { Store } from './store'
 

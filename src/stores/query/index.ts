@@ -6,7 +6,8 @@ import { Observable } from '../observable'
 import { primitive } from '../primitive'
 import { mappedStore } from '../mapped'
 import { createReport } from '../createReport'
-import { tag, type PublicTag } from '../../tags/tag'
+import { tag } from '../../tags/tag'
+import type { PublicTag } from '../../tags/types'
 
 const defaultTTL = 5 * 60 * 1000
 const defaultStaleTime = 0

@@ -28,3 +28,8 @@ export type PayloadOf<T extends AnyTag, Type extends TypeIn<T>> = (T & {
 })[Payload]
 
 export type Tags<O> = ValueUnion<{ [K in keyof O]: Tag<K, O[K]> }>
+
+type NonUnderscore<S> = S extends `_${string}` ? never : S
+export type PublicTag<E> = E extends { type: string }
+	? E & { type: NonUnderscore<E['type']> }
+	: E
